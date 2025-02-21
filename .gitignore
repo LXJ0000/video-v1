@@ -1,0 +1,55 @@
+# IDE和编辑器文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# 编译输出
+/bin/
+/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 依赖目录
+/vendor/
+/node_modules/
+
+# 日志文件
+*.log
+/logs/
+
+# 环境配置文件
+.env
+.env.local
+.env.*.local
+
+# 测试文件
+/coverage/
+*.test
+*.out
+
+# 临时文件
+/tmp/
+*.tmp
+
+# 媒体文件
+/uploads/
+/media/
+*.mp4
+*.avi
+*.mov
+*.jpg
+*.png
+*.gif
+
+# 数据库文件
+*.db
+*.sqlite
+
+# 系统文件
+Thumbs.db
+.DS_Store
