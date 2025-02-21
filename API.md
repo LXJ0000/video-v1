@@ -15,10 +15,10 @@
 
 ### 1. 上传视频
 #### 请求
-- 方法: `POST`
-- 路径: `/videos`
-- Content-Type: `multipart/form-data`
-- 参数:
+- **方法**: `POST`
+- **路径**: `/videos`
+- **Content-Type**: `multipart/form-data`
+- **请求参数**:
   - `file`: 视频文件（必填，支持 mp4/mov/avi/wmv/flv/mkv）
   - `cover`: 封面图文件（可选，支持 jpg/jpeg/png，最大2MB）
   - `title`: 视频标题（必填）
@@ -31,7 +31,8 @@
   - `tags`: 标签（可选，多个标签用逗号分隔）
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
@@ -50,13 +51,22 @@
     "updatedAt": "2024-01-20T10:00:00Z"
   }
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "文件太大",
+  "data": null
+}
+````
 
 ### 2. 获取视频列表
 #### 请求
-- 方法: `GET`
-- 路径: `/videos`
-- 参数:
+- **方法**: `GET`
+- **路径**: `/videos`
+- **请求参数**:
   - `page`: 页码（默认1）
   - `pageSize`: 每页数量（默认10，最大50）
   - `keyword`: 关键词搜索，匹配标题和描述
@@ -72,7 +82,8 @@
   - `sortOrder`: 排序方向（asc/desc）
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
@@ -97,15 +108,25 @@
     }]
   }
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "没有找到视频",
+  "data": null
+}
+````
 
 ### 3. 获取视频详情
 #### 请求
-- 方法: `GET`
-- 路径: `/videos/:id`
+- **方法**: `GET`
+- **路径**: `/videos/:id`
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
@@ -128,62 +149,92 @@
     "updatedAt": "2024-01-20T10:00:00Z"
   }
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "视频不存在",
+  "data": null
+}
+````
 
 ### 4. 更新视频信息
 #### 请求
-- 方法: `PUT`
-- 路径: `/videos/:id`
-- Content-Type: `application/json`
-- 请求体:
-  ```json
-  {
-    "title": "新标题",
-    "description": "新描述",
-    "status": "public",
-    "tags": ["标签1", "标签2"]
-  }
-  ```
+- **方法**: `PUT`
+- **路径**: `/videos/:id`
+- **Content-Type**: `application/json`
+- **请求体**:
+````json
+{
+  "title": "新标题",
+  "description": "新描述",
+  "status": "public",
+  "tags": ["标签1", "标签2"]
+}
+````
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
   "data": null
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "视频更新失败",
+  "data": null
+}
+````
 
 ### 5. 删除视频
 #### 请求
-- 方法: `DELETE`
-- 路径: `/videos/:id`
+- **方法**: `DELETE`
+- **路径**: `/videos/:id`
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
   "data": null
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "视频删除失败",
+  "data": null
+}
+````
 
 ### 6. 批量操作视频
 #### 请求
-- 方法: `POST`
-- 路径: `/videos/batch`
-- Content-Type: `application/json`
-- 请求体:
-  ```json
-  {
-    "ids": ["视频ID1", "视频ID2"],
-    "action": "update_status",  // delete/update_status
-    "status": "private"         // 当action为update_status时需要，可选值：public/private/draft
-  }
-  ```
+- **方法**: `POST`
+- **路径**: `/videos/batch`
+- **Content-Type**: `application/json`
+- **请求体**:
+````json
+{
+  "ids": ["视频ID1", "视频ID2"],
+  "action": "update_status",  // delete/update_status
+  "status": "private"         // 当action为update_status时需要，可选值：public/private/draft
+}
+````
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
@@ -193,18 +244,28 @@
     "failedIds": []
   }
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "批量操作失败",
+  "data": null
+}
+````
 
 ### 7. 更新视频缩略图
 #### 请求
-- 方法: `POST`
-- 路径: `/videos/:id/thumbnail`
-- Content-Type: `multipart/form-data`
-- 参数:
+- **方法**: `POST`
+- **路径**: `/videos/:id/thumbnail`
+- **Content-Type**: `multipart/form-data`
+- **请求参数**:
   - `file`: 图片文件（必填，支持jpg/png/gif，最大2MB）
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
@@ -212,15 +273,25 @@
     "thumbnailUrl": "缩略图URL"
   }
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "缩略图更新失败",
+  "data": null
+}
+````
 
 ### 8. 获取视频统计信息
 #### 请求
-- 方法: `GET`
-- 路径: `/videos/:id/stats`
+- **方法**: `GET`
+- **路径**: `/videos/:id/stats`
 
 #### 响应
-```json
+##### 成功响应
+````json
 {
   "code": 0,
   "msg": "success",
@@ -231,19 +302,293 @@
     "shares": 10
   }
 }
-```
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "视频统计信息获取失败",
+  "data": null
+}
+````
 
 ### 9. 视频流式播放
 #### 请求
-- 方法: `GET`
-- 路径: `/videos/:id/stream`
-- 支持范围请求（Range header）
+- **方法**: `GET`
+- **路径**: `/videos/:id/stream`
+- **支持范围请求**（Range header）
 
 #### 响应
 - Content-Type: video/*
 - Accept-Ranges: bytes
 - 支持断点续传
 - 直接返回视频流
+
+## 标记相关接口
+
+### 10. 添加标记
+#### 请求
+- **方法**: `POST`
+- **路径**: `/marks/:userId/:id`
+- **Content-Type**: `application/json`
+- **请求体**:
+````json
+{
+  "videoId": "test_video_id",
+  "timestamp": 123.45,
+  "content": "Test Mark"
+}
+````
+
+#### 响应
+##### 成功响应
+````json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "id": "标记ID",
+    "userId": "test_user_id",
+    "videoId": "test_video_id",
+    "timestamp": 123.45,
+    "content": "Test Mark",
+    "createdAt": "2024-01-20T10:00:00Z"
+  }
+}
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "添加标记失败",
+  "data": null
+}
+````
+
+### 11. 获取标记列表
+#### 请求
+- **方法**: `GET`
+- **路径**: `/marks/:userId/:id`
+
+#### 响应
+##### 成功响应
+````json
+{
+  "code": 0,
+  "msg": "success",
+  "data": [
+    {
+      "id": "标记ID",
+      "userId": "test_user_id",
+      "videoId": "test_video_id",
+      "timestamp": 123.45,
+      "content": "Test Mark",
+      "createdAt": "2024-01-20T10:00:00Z"
+    }
+  ]
+}
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "没有找到标记",
+  "data": null
+}
+````
+
+### 12. 添加注释
+#### 请求
+- **方法**: `POST`
+- **路径**: `/marks/:markId/annotations`
+- **Content-Type**: `application/json`
+- **请求体**:
+````json
+{
+  "content": "Test Annotation"
+}
+````
+
+#### 响应
+##### 成功响应
+````json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "id": "注释ID",
+    "markId": "标记ID",
+    "content": "Test Annotation",
+    "createdAt": "2024-01-20T10:00:00Z"
+  }
+}
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "添加注释失败",
+  "data": null
+}
+````
+
+### 13. 获取注释
+#### 请求
+- **方法**: `GET`
+- **路径**: `/marks/:markId/annotations`
+
+#### 响应
+##### 成功响应
+````json
+{
+  "code": 0,
+  "msg": "success",
+  "data": [
+    {
+      "id": "注释ID",
+      "markId": "标记ID",
+      "content": "Test Annotation",
+      "createdAt": "2024-01-20T10:00:00Z"
+    }
+  ]
+}
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "没有找到注释",
+  "data": null
+}
+````
+
+### 14. 添加笔记
+#### 请求
+- **方法**: `POST`
+- **路径**: `/notes/:userId/:id`
+- **Content-Type**: `application/json`
+- **请求体**:
+````json
+{
+  "videoId": "test_video_id",
+  "timestamp": 123.45,
+  "content": "Test Note"
+}
+````
+
+#### 响应
+##### 成功响应
+````json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "id": "笔记ID",
+    "userId": "test_user_id",
+    "videoId": "test_video_id",
+    "timestamp": 123.45,
+    "content": "Test Note",
+    "createdAt": "2024-01-20T10:00:00Z"
+  }
+}
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "添加笔记失败",
+  "data": null
+}
+````
+
+### 15. 获取笔记列表
+#### 请求
+- **方法**: `GET`
+- **路径**: `/notes/:userId/:id`
+
+#### 响应
+##### 成功响应
+````json
+{
+  "code": 0,
+  "msg": "success",
+  "data": [
+    {
+      "id": "笔记ID",
+      "userId": "test_user_id",
+      "videoId": "test_video_id",
+      "timestamp": 123.45,
+      "content": "Test Note",
+      "createdAt": "2024-01-20T10:00:00Z"
+    }
+  ]
+}
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "没有找到笔记",
+  "data": null
+}
+````
+
+### 16. 导出标记、注释和笔记
+#### 请求
+- **方法**: `GET`
+- **路径**: `/videos/export/:userId/:id`
+
+#### 响应
+##### 成功响应
+````json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "marks": [
+      {
+        "id": "标记ID",
+        "userId": "test_user_id",
+        "videoId": "test_video_id",
+        "timestamp": 123.45,
+        "content": "Test Mark"
+      }
+    ],
+    "annotations": [
+      {
+        "id": "注释ID",
+        "markId": "标记ID",
+        "content": "Test Annotation"
+      }
+    ],
+    "notes": [
+      {
+        "id": "笔记ID",
+        "userId": "test_user_id",
+        "videoId": "test_video_id",
+        "timestamp": 123.45,
+        "content": "Test Note"
+      }
+    ]
+  }
+}
+````
+
+##### 失败响应
+````json
+{
+  "code": 1,
+  "msg": "导出失败",
+  "data": null
+}
+````
 
 ## 错误码说明
 - 400: 请求参数错误
