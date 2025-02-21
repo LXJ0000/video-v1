@@ -32,6 +32,25 @@ func InitRoutes(r *gin.Engine) {
 			videos.POST("/batch", videoHandler.BatchOperation)          // 批量操作
 			videos.POST("/:id/thumbnail", videoHandler.UpdateThumbnail) // 更新缩略图
 			videos.GET("/:id/stats", videoHandler.GetStats)             // 获取统计信息
+
+			// 标记相关路由
+			marks := v1.Group("/marks/:userId/:id")
+			{
+				marks.POST("", AddMark)                          // 添加标记
+				marks.GET("", GetMarks)                          // 获取标记列表
+				marks.POST("/annotations/:markId", AddAnnotation) // 添加注释
+				marks.GET("/annotations/:markId", GetAnnotations) // 获取注释
+			}
+
+			// 笔记相关路由
+			notes := v1.Group("/notes/:userId/:id")
+			{
+				notes.POST("", AddNote) // 添加笔记
+				notes.GET("", GetNotes) // 获取笔记列表
+			}
+
+			// 导出相关路由
+			videos.GET("/export/:userId/:id", ExportMarks) // 导出标记、注释和笔记
 		}
 	}
 }
