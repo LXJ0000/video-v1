@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+storage:
+  uploadDir: "./uploads"
+
+jwt:
+  secret: "your-secret-key-change-it-in-production"
+  expire: 24  # 24小时 

@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 	"video-platform/config"
 
@@ -10,36 +12,32 @@ import (
 )
 
 var (
-	client *mongo.Client
-	db     *mongo.Database
+	client   *mongo.Client
+	database string
 )
 
 // InitMongoDB 初始化MongoDB连接
-func InitMongoDB() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// 创建MongoDB客户端
-	clientOptions := options.Client().ApplyURI(config.GlobalConfig.MongoDB.URI)
-	c, err := mongo.Connect(ctx, clientOptions)
+func InitMongoDB(ctx context.Context, cfg config.MongoDBConfig, isTest bool) error {
+	clientOptions := options.Client().ApplyURI(cfg.URI)
+	var err error
+	client, err = mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		return err
 	}
 
-	// 测试连接
-	err = c.Ping(ctx, nil)
-	if err != nil {
-		return err
+	// 根据环境选择数据库
+	if isTest {
+		database = cfg.TestDatabase
+	} else {
+		database = cfg.Database
 	}
 
-	client = c
-	db = client.Database(config.GlobalConfig.MongoDB.Database)
-	return nil
+	return client.Ping(ctx, nil)
 }
 
 // GetCollection 获取集合
 func GetCollection(name string) *mongo.Collection {
-	return db.Collection(name)
+	return client.Database(database).Collection(name)
 }
 
 // GetClient 获取MongoDB客户端
@@ -54,4 +52,22 @@ func CloseMongoDB() {
 		defer cancel()
 		client.Disconnect(ctx)
 	}
+}
+
+// CleanupTestData 清理测试数据
+func CleanupTestData(ctx context.Context) error {
+	if database == config.GlobalConfig.MongoDB.TestDatabase {
+		// 改用删除集合而不是删除数据库
+		collections := []string{"users", "marks", "annotations", "notes", "videos"}
+		for _, name := range collections {
+			if err := client.Database(database).Collection(name).Drop(ctx); err != nil {
+				// 忽略集合不存在的错误
+				if !strings.Contains(err.Error(), "ns not found") {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return errors.New("can only cleanup test database")
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +44,7 @@ func setupTestRouter(t *testing.T) (*gin.Engine, func()) {
 	if err := config.Init(); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.InitMongoDB(); err != nil {
+	if err := database.InitMongoDB(context.Background(), config.GlobalConfig.MongoDB, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,33 +90,33 @@ func cleanTestData(t *testing.T) {
 	}
 }
 
-func TestMain(m *testing.M) {
-	// 初始化配置
-	if err := config.Init(); err != nil {
-		fmt.Printf("配置初始化失败: %v\n", err)
-		os.Exit(1)
-	}
+// func TestMain(m *testing.M) {
+// 	// 初始化配置
+// 	if err := config.Init(); err != nil {
+// 		fmt.Printf("配置初始化失败: %v\n", err)
+// 		os.Exit(1)
+// 	}
 
-	// 初始化数据库连接
-	if err := database.InitMongoDB(); err != nil {
-		fmt.Printf("数据库连接失败: %v\n", err)
-		os.Exit(1)
-	}
+// 	// 初始化数据库连接
+// 	if err := database.InitMongoDB(context.Background(), config.GlobalConfig.MongoDB, true); err != nil {
+// 		fmt.Printf("数据库连接失败: %v\n", err)
+// 		os.Exit(1)
+// 	}
 
-	// 运行测试前清理
-	cleanAllTestData()
+// 	// 运行测试前清理
+// 	cleanAllTestData()
 
-	// 运行测试
-	code := m.Run()
+// 	// 运行测试
+// 	code := m.Run()
 
-	// 测试结束后清理
-	cleanAllTestData()
+// 	// 测试结束后清理
+// 	cleanAllTestData()
 
-	// 关闭数据库连接
-	database.CloseMongoDB()
+// 	// 关闭数据库连接
+// 	database.CloseMongoDB()
 
-	os.Exit(code)
-}
+// 	os.Exit(code)
+// }
 
 // cleanAllTestData 清理所有测试数据（不需要testing.T）
 func cleanAllTestData() {
@@ -178,45 +179,45 @@ func cleanDirectory(dir string) {
 
 // 修改所有测试用例，使用 defer 调用清理函数
 func TestVideoHandler_Upload(t *testing.T) {
-	r, cleanup := setupTestRouter(t)
+	cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
+	token := getTestToken(t)
+
 	// 创建测试文件
-	tempFile := createTestVideoFile(t)
+	tempFile, err := os.CreateTemp("", "test-video-*.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.Remove(tempFile.Name())
 
-	// 创建multipart表单
-	body := new(bytes.Buffer)
+	// 准备请求
+	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("file", "test.mp4")
 	if err != nil {
 		t.Fatal(err)
 	}
-	fileContent, err := os.ReadFile(tempFile.Name())
+	_, err = io.Copy(part, tempFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	part.Write(fileContent)
-
-	// 添加其他表单字段
-	writer.WriteField("title", "测试视频")
-	writer.WriteField("description", "这是一个测试视频")
-	writer.WriteField("userId", testMark)
+	writer.WriteField("title", "Test Video")
 	writer.WriteField("duration", "180.5")
 	writer.Close()
 
-	// 创建请求
+	// 发送请求
 	req := httptest.NewRequest("POST", "/api/v1/videos", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
-
-	// 执行请求
-	r.ServeHTTP(w, req)
+	router.ServeHTTP(w, req)
 
 	// 验证响应
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response struct {
 		Code int         `json:"code"`
+		Msg  string      `json:"msg"`
 		Data model.Video `json:"data"`
 	}
 	err = json.NewDecoder(w.Body).Decode(&response)
@@ -229,8 +230,11 @@ func TestVideoHandler_GetList(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
 
+	token := getTestToken(t)
+
 	// 创建请求
 	req := httptest.NewRequest("GET", "/api/v1/videos?page=1&pageSize=10", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -248,11 +252,14 @@ func TestVideoHandler_GetByID(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
 
+	token := getTestToken(t)
+
 	// 先上传一个视频
 	video := uploadTestVideo(t, r)
 
 	// 创建请求
 	req := httptest.NewRequest("GET", "/api/v1/videos/"+video.ID.Hex(), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -270,11 +277,14 @@ func TestVideoHandler_Stream(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
 
+	token := getTestToken(t)
+
 	// 先上传一个视频
 	video := uploadTestVideo(t, r)
 
 	// 创建请求
 	req := httptest.NewRequest("GET", "/api/v1/videos/"+video.ID.Hex()+"/stream", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -325,6 +335,8 @@ func uploadTestVideo(t *testing.T, r *gin.Engine) *model.Video {
 		os.Remove(tempFile.Name())
 	}()
 
+	token := getTestToken(t)
+
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 
@@ -348,13 +360,14 @@ func uploadTestVideo(t *testing.T, r *gin.Engine) *model.Video {
 	// 添加其他字段
 	writer.WriteField("title", "测试视频")
 	writer.WriteField("description", "这是一个测试视频")
-	writer.WriteField("userId", testMark)
+	writer.WriteField("userId", TestUserID)
 	writer.WriteField("duration", "180.5")
 	writer.Close()
 
 	// 创建请求
 	req := httptest.NewRequest("POST", "/api/v1/videos", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -382,6 +395,8 @@ func TestVideoHandler_BatchOperation(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
 
+	token := getTestToken(t)
+
 	// 先上传两个测试视频
 	video1 := uploadTestVideo(t, r)
 	video2 := uploadTestVideo(t, r)
@@ -401,6 +416,7 @@ func TestVideoHandler_BatchOperation(t *testing.T) {
 	// 创建请求
 	req := httptest.NewRequest("POST", "/api/v1/videos/batch", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -418,6 +434,8 @@ func TestVideoHandler_UpdateThumbnail(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
 
+	token := getTestToken(t)
+
 	// 先上传一个测试视频
 	video := uploadTestVideo(t, r)
 
@@ -434,6 +452,7 @@ func TestVideoHandler_UpdateThumbnail(t *testing.T) {
 	// 创建请求
 	req := httptest.NewRequest("POST", "/api/v1/videos/"+video.ID.Hex()+"/thumbnail", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -451,11 +470,14 @@ func TestVideoHandler_GetStats(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
 
+	token := getTestToken(t)
+
 	// 先上传一个测试视频
 	video := uploadTestVideo(t, r)
 
 	// 创建请求
 	req := httptest.NewRequest("GET", "/api/v1/videos/"+video.ID.Hex()+"/stats", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -473,6 +495,8 @@ func TestVideoHandler_GetStats(t *testing.T) {
 func TestVideoHandler_UploadWithCover(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
+
+	token := getTestToken(t)
 
 	// 创建测试文件
 	videoContent := []byte("fake video content")
@@ -507,6 +531,7 @@ func TestVideoHandler_UploadWithCover(t *testing.T) {
 	// 创建请求
 	req := httptest.NewRequest("POST", "/api/v1/videos", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求
@@ -530,6 +555,8 @@ func TestVideoHandler_UploadWithCover(t *testing.T) {
 func TestVideoHandler_UploadInvalidCover(t *testing.T) {
 	r, cleanup := setupTestRouter(t)
 	defer cleanup()
+
+	token := getTestToken(t)
 
 	// 创建过大的封面图
 	largeCoverContent := make([]byte, 3*1024*1024) // 3MB
@@ -560,6 +587,7 @@ func TestVideoHandler_UploadInvalidCover(t *testing.T) {
 	// 创建请求
 	req := httptest.NewRequest("POST", "/api/v1/videos", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	// 执行请求

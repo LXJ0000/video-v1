@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"video-platform/config"
 	"video-platform/internal/handler"
@@ -17,12 +18,13 @@ import (
 func main() {
 	// 初始化配置
 	if err := config.Init(); err != nil {
-		log.Fatalf("配置初始化失败: %v", err)
+		log.Fatal(err)
 	}
 
-	// 初始化数据库连接
-	if err := database.InitMongoDB(); err != nil {
-		log.Fatalf("MongoDB连接失败: %v", err)
+	// 连接数据库（生产环境）
+	ctx := context.Background()
+	if err := database.InitMongoDB(ctx, config.GlobalConfig.MongoDB, false); err != nil {
+		log.Fatal(err)
 	}
 	defer database.CloseMongoDB()
 

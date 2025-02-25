@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"testing"
 	"video-platform/config"
 )
@@ -12,7 +13,7 @@ func TestMongoDBConnection(t *testing.T) {
 	}
 
 	// 测试数据库连接
-	err := InitMongoDB()
+	err := InitMongoDB(context.Background(), config.GlobalConfig.MongoDB, true)
 	if err != nil {
 		t.Fatalf("MongoDB连接失败: %v", err)
 	}

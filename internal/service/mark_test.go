@@ -8,8 +8,6 @@ import (
 	"video-platform/config"
 	"video-platform/internal/model"
 	"video-platform/pkg/database"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 var markService *MarkService
@@ -21,8 +19,9 @@ func setup() {
 		os.Exit(1)
 	}
 
-	// 初始化数据库连接
-	if err := database.InitMongoDB(); err != nil {
+	// 初始化测试数据库连接
+	ctx := context.Background()
+	if err := database.InitMongoDB(ctx, config.GlobalConfig.MongoDB, true); err != nil {
 		fmt.Printf("数据库连接失败: %v\n", err)
 		os.Exit(1)
 	}
@@ -31,10 +30,10 @@ func setup() {
 
 func teardown() {
 	// 清理测试数据
-	client := database.GetClient()
-	client.Database("video_platform").Collection("marks").DeleteMany(context.TODO(), bson.M{})
-	client.Database("video_platform").Collection("annotations").DeleteMany(context.TODO(), bson.M{})
-	client.Database("video_platform").Collection("notes").DeleteMany(context.TODO(), bson.M{})
+	ctx := context.Background()
+	if err := database.CleanupTestData(ctx); err != nil {
+		fmt.Printf("清理测试数据失败: %v\n", err)
+	}
 }
 
 func TestAddMark(t *testing.T) {

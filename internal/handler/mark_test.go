@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"video-platform/internal/model"
 
@@ -53,10 +55,15 @@ func checkResponseFormat(t *testing.T, w *httptest.ResponseRecorder) {
 
 func TestAddMarkHandlerWithUserID(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	body := bytes.NewBufferString(`{"videoId":"test_video_id","timestamp":123.45,"content":"Test Mark"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/marks/test_user_id/test_video_id", body)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -69,9 +76,13 @@ func TestAddMarkHandlerWithUserID(t *testing.T) {
 
 func TestGetMarksHandlerWithUserID(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -79,6 +90,7 @@ func TestGetMarksHandlerWithUserID(t *testing.T) {
 	markService.AddMark(context.Background(), mark.UserID, &mark)
 
 	req, _ := http.NewRequest("GET", "/api/v1/marks/test_user_id/test_video_id", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -90,9 +102,13 @@ func TestGetMarksHandlerWithUserID(t *testing.T) {
 
 func TestAddAnnotationHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -102,6 +118,7 @@ func TestAddAnnotationHandler(t *testing.T) {
 	body := bytes.NewBufferString(`{"markId":"` + mark.ID.Hex() + `","content":"Test Annotation"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/marks/"+mark.ID.Hex()+"/annotations", body)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -114,9 +131,13 @@ func TestAddAnnotationHandler(t *testing.T) {
 
 func TestGetAnnotationsHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -130,6 +151,7 @@ func TestGetAnnotationsHandler(t *testing.T) {
 	markService.AddAnnotation(context.Background(), &annotation)
 
 	req, _ := http.NewRequest("GET", "/api/v1/marks/"+mark.ID.Hex()+"/annotations", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -141,10 +163,15 @@ func TestGetAnnotationsHandler(t *testing.T) {
 
 func TestAddNoteHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	body := bytes.NewBufferString(`{"videoId":"test_video_id","timestamp":123.45,"content":"Test Note"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/notes/test_user_id/test_video_id", body)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -157,9 +184,13 @@ func TestAddNoteHandler(t *testing.T) {
 
 func TestGetNotesHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	note := model.Note{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Note",
@@ -167,6 +198,7 @@ func TestGetNotesHandler(t *testing.T) {
 	markService.AddNote(context.Background(), &note)
 
 	req, _ := http.NewRequest("GET", "/api/v1/notes/test_user_id/test_video_id", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -178,9 +210,13 @@ func TestGetNotesHandler(t *testing.T) {
 
 func TestExportMarksHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -188,6 +224,7 @@ func TestExportMarksHandler(t *testing.T) {
 	markService.AddMark(context.Background(), mark.UserID, &mark)
 
 	req, _ := http.NewRequest("GET", "/api/v1/videos/export/test_user_id/test_video_id", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -200,9 +237,13 @@ func TestExportMarksHandler(t *testing.T) {
 // 添加新的测试用例
 func TestUpdateMarkHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -212,6 +253,7 @@ func TestUpdateMarkHandler(t *testing.T) {
 	body := bytes.NewBufferString(`{"content":"Updated Mark"}`)
 	req, _ := http.NewRequest("PUT", "/api/v1/marks/test_user_id/test_video_id/"+mark.ID.Hex(), body)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -224,9 +266,13 @@ func TestUpdateMarkHandler(t *testing.T) {
 
 func TestDeleteMarkHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -234,6 +280,7 @@ func TestDeleteMarkHandler(t *testing.T) {
 	markService.AddMark(context.Background(), mark.UserID, &mark)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/marks/test_user_id/test_video_id/"+mark.ID.Hex(), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -245,9 +292,13 @@ func TestDeleteMarkHandler(t *testing.T) {
 
 func TestUpdateAnnotationHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -263,6 +314,7 @@ func TestUpdateAnnotationHandler(t *testing.T) {
 	body := bytes.NewBufferString(`{"content":"Updated Annotation"}`)
 	req, _ := http.NewRequest("PUT", "/api/v1/marks/test_user_id/test_video_id/annotations/"+annotation.ID.Hex(), body)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -275,9 +327,13 @@ func TestUpdateAnnotationHandler(t *testing.T) {
 
 func TestDeleteAnnotationHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	mark := model.Mark{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Mark",
@@ -291,6 +347,7 @@ func TestDeleteAnnotationHandler(t *testing.T) {
 	markService.AddAnnotation(context.Background(), &annotation)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/marks/test_user_id/test_video_id/annotations/"+annotation.ID.Hex(), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -302,9 +359,13 @@ func TestDeleteAnnotationHandler(t *testing.T) {
 
 func TestUpdateNoteHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	note := model.Note{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Note",
@@ -314,6 +375,7 @@ func TestUpdateNoteHandler(t *testing.T) {
 	body := bytes.NewBufferString(`{"content":"Updated Note"}`)
 	req, _ := http.NewRequest("PUT", "/api/v1/notes/test_user_id/test_video_id/"+note.ID.Hex(), body)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -326,9 +388,13 @@ func TestUpdateNoteHandler(t *testing.T) {
 
 func TestDeleteNoteHandler(t *testing.T) {
 	setupRouter()
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	token := getTestToken(t)
 
 	note := model.Note{
-		UserID:    "test_user_id",
+		UserID:    TestUserID,
 		VideoID:   "test_video_id",
 		Timestamp: 123.45,
 		Content:   "Test Note",
@@ -336,6 +402,7 @@ func TestDeleteNoteHandler(t *testing.T) {
 	markService.AddNote(context.Background(), &note)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/notes/test_user_id/test_video_id/"+note.ID.Hex(), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -343,4 +410,15 @@ func TestDeleteNoteHandler(t *testing.T) {
 		t.Fatalf("Expected status 200, got %d", w.Code)
 	}
 	checkResponseFormat(t, w)
+}
+
+func TestMain(m *testing.M) {
+	// 设置串行执行测试
+	flag.Parse()
+	if testing.Short() {
+		flag.Set("test.parallel", "1")
+	}
+
+	// 运行测试
+	os.Exit(m.Run())
 }

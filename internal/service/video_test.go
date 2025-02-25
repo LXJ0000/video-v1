@@ -87,7 +87,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// 初始化数据库连接
-	if err := database.InitMongoDB(); err != nil {
+	if err := database.InitMongoDB(context.Background(), config.GlobalConfig.MongoDB, true); err != nil {
 		fmt.Printf("数据库连接失败: %v\n", err)
 		os.Exit(1)
 	}
