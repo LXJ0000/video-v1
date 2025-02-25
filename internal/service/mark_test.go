@@ -10,7 +10,7 @@ import (
 	"video-platform/pkg/database"
 )
 
-var markService *MarkService
+var markService MarkService
 
 func setup() {
 	// 初始化配置

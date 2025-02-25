@@ -65,59 +65,75 @@
 ### 2. 获取视频列表
 #### 请求
 - **方法**: `GET`
-- **路径**: `/videos`
-- **请求参数**:
-  - `page`: 页码（默认1）
+- **路径**: `/api/v1/videos`
+- **参数**:
+  - `page`: 页码（从1开始，默认1）
   - `pageSize`: 每页数量（默认10，最大50）
-  - `keyword`: 关键词搜索，匹配标题和描述
-  - `status`: 视频状态筛选
-    - 不传：显示所有视频
-    - `public`: 只显示公开视频
-    - `private`: 只显示私有视频
-    - `draft`: 只显示草稿
-  - `startDate`: 开始日期（格式：YYYY-MM-DD）
-  - `endDate`: 结束日期（格式：YYYY-MM-DD）
-  - `tags`: 标签筛选，多个标签用逗号分隔
-  - `sortBy`: 排序字段（created_at/views/likes/file_size）
-  - `sortOrder`: 排序方向（asc/desc）
+  - `userId`: 用户ID（可选，指定后只返回该用户的视频）
+  - `status`: 视频状态（可选，多个状态用逗号分隔）
+    - public: 公开视频
+    - private: 私有视频（需要是视频作者）
+    - draft: 草稿（需要是视频作者）
+  - `sort`: 排序方式（可选，默认 "-created_at"）
+    - created_at: 创建时间升序
+    - -created_at: 创建时间降序
+    - title: 标题升序
+    - -title: 标题降序
+  - `keyword`: 搜索关键词（可选，搜索标题和描述）
 
 #### 响应
-##### 成功响应
-````json
+```json
 {
   "code": 0,
   "msg": "success",
   "data": {
     "total": 100,
-    "items": [{
-      "id": "视频ID",
-      "title": "视频标题",
-      "description": "视频描述",
-      "fileSize": 1024,
-      "format": "mp4",
-      "status": "public",
-      "thumbnailUrl": "缩略图URL",
-      "tags": ["标签1", "标签2"],
-      "stats": {
-        "views": 100,
-        "likes": 50,
-        "comments": 20,
-        "shares": 10
-      },
-      "createdAt": "2024-01-20T10:00:00Z"
-    }]
+    "page": 1,
+    "pageSize": 10,
+    "items": [
+      {
+        "id": "string",
+        "userId": "string",
+        "title": "string",
+        "description": "string",
+        "coverUrl": "string",
+        "duration": 180.5,
+        "status": "public",
+        "createdAt": "string",
+        "updatedAt": "string"
+      }
+    ]
   }
 }
-````
+```
 
-##### 失败响应
-````json
-{
-  "code": 1,
-  "msg": "没有找到视频",
-  "data": null
-}
-````
+#### 说明
+1. 访问权限
+   - 未登录用户只能看到 public 状态的视频
+   - 登录用户可以看到：
+     - 所有 public 状态的视频
+     - 自己的 private 和 draft 状态的视频
+   - 管理员可以看到所有视频
+
+2. 列表过滤
+   - 不指定 userId 时：
+     - 默认只返回 public 状态的视频
+     - 登录用户额外返回自己的 private 和 draft 视频
+   - 指定 userId 时：
+     - 只返回该用户的视频
+     - 需要考虑访问权限（只能看到允许的状态）
+
+3. 状态过滤
+   - 可以指定多个状态：`status=public,private`
+   - 权限验证：
+     - private 和 draft 状态只对视频作者可见
+     - 非视频作者指定这些状态会被忽略
+
+4. 搜索说明
+   - 关键词搜索范围：标题、描述
+   - 支持模糊匹配
+   - 不区分大小写
+   - 多个关键词用空格分隔（与关系）
 
 ### 3. 获取视频详情
 #### 请求

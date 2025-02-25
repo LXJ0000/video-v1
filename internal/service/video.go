@@ -30,6 +30,7 @@ type VideoService interface {
 	UpdateThumbnail(ctx context.Context, id string, file *multipart.FileHeader) (string, error)
 	GetStats(ctx context.Context, id string) (*model.VideoStats, error)
 	IncrementStats(ctx context.Context, id string, field string) error
+	GetVideoList(ctx context.Context, currentUserID string, opts ListOptions) ([]model.Video, int64, error)
 }
 
 type videoService struct {
@@ -493,6 +494,112 @@ func (s *videoService) IncrementStats(ctx context.Context, id string, field stri
 	)
 
 	return err
+}
+
+// ListOptions 视频列表查询选项
+type ListOptions struct {
+	Page     int
+	PageSize int
+	UserID   string    // 指定用户的视频
+	Status   []string  // 状态过滤
+	Sort     string    // 排序方式
+	Keyword  string    // 搜索关键词
+}
+
+// GetVideoList 获取视频列表
+func (s *videoService) GetVideoList(ctx context.Context, currentUserID string, opts ListOptions) ([]model.Video, int64, error) {
+	collection := database.GetCollection("videos")
+	
+	// 构建查询条件
+	filter := bson.M{}
+	
+	// 1. 处理用户ID过滤
+	if opts.UserID != "" {
+		// 查看指定用户的视频
+		filter["user_id"] = opts.UserID
+		
+		if currentUserID != opts.UserID {
+			// 如果不是查看自己的视频，只能看到公开视频
+			filter["status"] = "public"
+		}
+	} else {
+		// 查看所有视频
+		if currentUserID != "" {
+			// 已登录用户：看到所有公开视频和自己的私有/草稿视频
+			filter["$or"] = []bson.M{
+				{"status": "public"},
+				{"$and": []bson.M{
+					{"user_id": currentUserID},
+					{"status": bson.M{"$in": []string{"private", "draft"}}},
+				}},
+			}
+		} else {
+			// 未登录用户：只能看到公开视频
+			filter["status"] = "public"
+		}
+	}
+	
+	// 2. 处理状态过滤
+	if len(opts.Status) > 0 {
+		validStatus := make([]string, 0)
+		for _, status := range opts.Status {
+			// 对于 private 和 draft 状态，需要是视频作者
+			if status == "public" || 
+			   (currentUserID != "" && opts.UserID == currentUserID && 
+			   (status == "private" || status == "draft")) {
+				validStatus = append(validStatus, status)
+			}
+		}
+		if len(validStatus) > 0 {
+			filter["status"] = bson.M{"$in": validStatus}
+		}
+	}
+	
+	// 3. 处理关键词搜索
+	if opts.Keyword != "" {
+		filter["$or"] = []bson.M{
+			{"title": bson.M{"$regex": opts.Keyword, "$options": "i"}},
+			{"description": bson.M{"$regex": opts.Keyword, "$options": "i"}},
+		}
+	}
+	
+	// 4. 获取总数
+	total, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	
+	// 5. 处理排序
+	sortOpts := bson.D{}
+	if opts.Sort != "" {
+		if strings.HasPrefix(opts.Sort, "-") {
+			sortOpts = append(sortOpts, bson.E{Key: opts.Sort[1:], Value: -1})
+		} else {
+			sortOpts = append(sortOpts, bson.E{Key: opts.Sort, Value: 1})
+		}
+	} else {
+		// 默认按创建时间倒序
+		sortOpts = append(sortOpts, bson.E{Key: "created_at", Value: -1})
+	}
+	
+	// 6. 查询数据
+	findOptions := options.Find().
+		SetSort(sortOpts).
+		SetSkip(int64((opts.Page - 1) * opts.PageSize)).
+		SetLimit(int64(opts.PageSize))
+	
+	cursor, err := collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+	
+	var videos []model.Video
+	if err = cursor.All(ctx, &videos); err != nil {
+		return nil, 0, err
+	}
+	
+	return videos, total, nil
 }
 
 // 其他辅助函数

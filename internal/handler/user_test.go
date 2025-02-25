@@ -2,21 +2,53 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"video-platform/config"
 	"video-platform/internal/model"
+	"video-platform/internal/service"
+	"video-platform/pkg/database"
 
 	"github.com/gin-gonic/gin"
 )
 
+var (
+	userHandler     *UserHandler
+	testUserService service.UserService
+)
+
+func setupUserTest(t *testing.T) func() {
+	// 初始化配置
+	if err := config.Init(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 初始化数据库
+	if err := database.InitMongoDB(context.Background(), config.GlobalConfig.MongoDB, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// 创建服务和handler实例
+	testUserService = service.NewUserService()
+	userHandler = NewUserHandler(testUserService)
+
+	// 返回清理函数
+	return func() {
+		if err := database.CleanupTestData(context.Background()); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
 func TestRegister(t *testing.T) {
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupUserTest(t)
 	defer cleanup()
 
 	r := gin.Default()
-	r.POST("/register", Register)
+	r.POST("/register", userHandler.Register)
 
 	// 测试成功注册
 	body := model.RegisterRequest{
@@ -59,12 +91,12 @@ func TestRegister(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupUserTest(t)
 	defer cleanup()
 
 	r := gin.Default()
-	r.POST("/register", Register)
-	r.POST("/login", Login)
+	r.POST("/register", userHandler.Register)
+	r.POST("/login", userHandler.Login)
 
 	// 先注册一个用户
 	registerBody := model.RegisterRequest{
@@ -94,7 +126,7 @@ func TestLogin(t *testing.T) {
 	}
 
 	var response struct {
-		Code int `json:"code"`
+		Code int    `json:"code"`
 		Msg  string `json:"msg"`
 		Data struct {
 			User  *model.User `json:"user"`
@@ -112,4 +144,4 @@ func TestLogin(t *testing.T) {
 	if response.Data.Token == "" {
 		t.Error("Expected token not to be empty")
 	}
-} 
+}

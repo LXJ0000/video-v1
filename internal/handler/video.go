@@ -21,9 +21,12 @@ type VideoHandler struct {
 	videoService service.VideoService
 }
 
-func NewVideoHandler() *VideoHandler {
+func NewVideoHandler(videoService service.VideoService) *VideoHandler {
+	if videoService == nil {
+		videoService = service.NewVideoService()
+	}
 	return &VideoHandler{
-		videoService: service.NewVideoService(),
+		videoService: videoService,
 	}
 }
 
@@ -272,4 +275,47 @@ func (h *VideoHandler) GetStats(c *gin.Context) {
 	}
 
 	response.Success(c, stats)
+}
+
+// GetVideoList 获取视频列表
+func (h *VideoHandler) GetVideoList(c *gin.Context) {
+	// 1. 获取查询参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	if pageSize > 50 {
+		pageSize = 50
+	}
+
+	// 获取当前用户ID（如果已登录）
+	currentUserID, _ := c.Get("userId")
+	userIDStr, _ := currentUserID.(string)
+
+	// 2. 构建查询选项
+	opts := service.ListOptions{
+		Page:     page,
+		PageSize: pageSize,
+		UserID:   c.Query("userId"),  // 可选：指定用户的视频
+		Keyword:  c.Query("keyword"), // 可选：搜索关键词
+		Sort:     c.Query("sort"),    // 可选：排序方式
+	}
+
+	// 处理状态过滤
+	if status := c.Query("status"); status != "" {
+		opts.Status = strings.Split(status, ",")
+	}
+
+	// 3. 调用 service 获取视频列表
+	videos, total, err := h.videoService.GetVideoList(c.Request.Context(), userIDStr, opts)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "获取视频列表失败")
+		return
+	}
+
+	// 4. 返回结果
+	response.Success(c, gin.H{
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+		"items":    videos,
+	})
 }

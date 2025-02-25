@@ -12,16 +12,29 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type UserService struct{}
+// UserService 用户服务接口
+type UserService interface {
+	Register(ctx context.Context, req *model.RegisterRequest) (*model.User, error)
+	Login(ctx context.Context, req *model.LoginRequest) (*model.User, string, error)
+	GetByID(ctx context.Context, id string) (*model.User, error)
+	UpdateProfile(ctx context.Context, id string, profile *model.UserProfile) error
+}
 
-func NewUserService() *UserService {
-	return &UserService{}
+type userService struct {
+	collection string
+}
+
+// NewUserService 创建用户服务实例
+func NewUserService() UserService {
+	return &userService{
+		collection: "users",
+	}
 }
 
 // Register 用户注册
-func (s *UserService) Register(ctx context.Context, req *model.RegisterRequest) (*model.User, error) {
+func (s *userService) Register(ctx context.Context, req *model.RegisterRequest) (*model.User, error) {
 	// 检查用户名是否已存在
-	collection := database.GetCollection("users")
+	collection := database.GetCollection(s.collection)
 	var existUser model.User
 	err := collection.FindOne(ctx, bson.M{"username": req.Username}).Decode(&existUser)
 	if err == nil {
@@ -53,8 +66,8 @@ func (s *UserService) Register(ctx context.Context, req *model.RegisterRequest) 
 }
 
 // Login 用户登录
-func (s *UserService) Login(ctx context.Context, req *model.LoginRequest) (*model.User, string, error) {
-	collection := database.GetCollection("users")
+func (s *userService) Login(ctx context.Context, req *model.LoginRequest) (*model.User, string, error) {
+	collection := database.GetCollection(s.collection)
 	var user model.User
 	err := collection.FindOne(ctx, bson.M{"username": req.Username}).Decode(&user)
 	if err != nil {
@@ -76,12 +89,17 @@ func (s *UserService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 }
 
 // GetUserByID 根据ID获取用户信息
-func (s *UserService) GetUserByID(ctx context.Context, id primitive.ObjectID) (*model.User, error) {
-	collection := database.GetCollection("users")
+func (s *userService) GetByID(ctx context.Context, id string) (*model.User, error) {
+	collection := database.GetCollection(s.collection)
 	var user model.User
 	err := collection.FindOne(ctx, bson.M{"_id": id}).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
-} 
+}
+
+func (s *userService) UpdateProfile(ctx context.Context, id string, profile *model.UserProfile) error {
+	// Implementation needed
+	return nil
+}

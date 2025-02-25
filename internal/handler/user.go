@@ -4,69 +4,57 @@ import (
 	"net/http"
 	"video-platform/internal/model"
 	"video-platform/internal/service"
+	"video-platform/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-var userService = service.NewUserService()
+type UserHandler struct {
+	userService service.UserService
+}
+
+func NewUserHandler(userService service.UserService) *UserHandler {
+	if userService == nil {
+		userService = service.NewUserService()
+	}
+	return &UserHandler{
+		userService: userService,
+	}
+}
 
 // Register 用户注册
-func Register(c *gin.Context) {
+func (h *UserHandler) Register(c *gin.Context) {
 	var req model.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求参数",
-			"data": nil,
-		})
+		response.Fail(c, http.StatusBadRequest, "无效的请求参数")
 		return
 	}
 
-	user, err := userService.Register(c.Request.Context(), &req)
+	user, err := h.userService.Register(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  err.Error(),
-			"data": nil,
-		})
+		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": user,
-	})
+	response.Success(c, user)
 }
 
 // Login 用户登录
-func Login(c *gin.Context) {
+func (h *UserHandler) Login(c *gin.Context) {
 	var req model.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求参数",
-			"data": nil,
-		})
+		response.Fail(c, http.StatusBadRequest, "无效的请求参数")
 		return
 	}
 
-	user, token, err := userService.Login(c.Request.Context(), &req)
+	user, token, err := h.userService.Login(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code": 1,
-			"msg":  err.Error(),
-			"data": nil,
-		})
+		response.Fail(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": gin.H{
-			"user":  user,
-			"token": token,
-		},
+	response.Success(c, gin.H{
+		"user":  user,
+		"token": token,
 	})
-} 
+}

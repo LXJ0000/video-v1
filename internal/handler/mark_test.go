@@ -9,17 +9,59 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"video-platform/config"
 	"video-platform/internal/model"
+	"video-platform/internal/service"
+	"video-platform/pkg/database"
 
 	"github.com/gin-gonic/gin"
 )
 
-var router *gin.Engine
+var (
+	router          *gin.Engine
+	markHandler     *MarkHandler
+	testMarkService service.MarkService
+)
 
 func setupRouter() {
 	gin.SetMode(gin.TestMode)
 	router = gin.Default()
-	InitRoutes(router)
+
+	// 创建服务实例
+	testMarkService = service.NewMarkService()
+	markHandler = NewMarkHandler(testMarkService)
+
+	// API v1 分组
+	v1 := router.Group("/api/v1")
+	{
+		// 标记相关路由
+		marks := v1.Group("/marks/:userId/:id")
+		{
+			marks.POST("", markHandler.AddMark)                          // 添加标记
+			marks.GET("", markHandler.GetMarks)                          // 获取标记列表
+			marks.PUT("/:markId", markHandler.UpdateMark)                // 更新标记
+			marks.DELETE("/:markId", markHandler.DeleteMark)             // 删除标记
+			marks.POST("/annotations/:markId", markHandler.AddAnnotation) // 添加注释
+			marks.GET("/annotations/:markId", markHandler.GetAnnotations) // 获取注释
+			marks.PUT("/annotations/:annotationId", markHandler.UpdateAnnotation)    // 更新注释
+			marks.DELETE("/annotations/:annotationId", markHandler.DeleteAnnotation) // 删除注释
+		}
+
+		// 笔记相关路由
+		notes := v1.Group("/notes/:userId/:id")
+		{
+			notes.POST("", markHandler.AddNote)              // 添加笔记
+			notes.GET("", markHandler.GetNotes)              // 获取笔记列表
+			notes.PUT("/:noteId", markHandler.UpdateNote)    // 更新笔记
+			notes.DELETE("/:noteId", markHandler.DeleteNote) // 删除笔记
+		}
+
+		// 导出相关路由
+		videos := v1.Group("/videos")
+		{
+			videos.GET("/export/:userId/:id", markHandler.ExportMarks) // 导出标记、注释和笔记
+		}
+	}
 }
 
 // 添加辅助函数
@@ -53,9 +95,51 @@ func checkResponseFormat(t *testing.T, w *httptest.ResponseRecorder) {
 	}
 }
 
+func setupTest(t *testing.T) func() {
+	// 初始化配置
+	if err := config.Init(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 初始化数据库
+	if err := database.InitMongoDB(context.Background(), config.GlobalConfig.MongoDB, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// 创建服务和handler实例
+	testMarkService = service.NewMarkService()
+	markHandler = NewMarkHandler(testMarkService)
+
+	// 返回清理函数
+	return func() {
+		if err := database.CleanupTestData(context.Background()); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestAddMark(t *testing.T) {
+	cleanup := setupTest(t)
+	defer cleanup()
+
+	mark := &model.Mark{
+		UserID:    TestUserID,
+		VideoID:   "test_video_id",
+		Timestamp: 123.45,
+		Content:   "Test Mark",
+	}
+
+	err := testMarkService.AddMark(context.Background(), mark.UserID, mark)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// ... 其他测试代码
+}
+
 func TestAddMarkHandlerWithUserID(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -76,7 +160,7 @@ func TestAddMarkHandlerWithUserID(t *testing.T) {
 
 func TestGetMarksHandlerWithUserID(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -87,7 +171,7 @@ func TestGetMarksHandlerWithUserID(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	req, _ := http.NewRequest("GET", "/api/v1/marks/test_user_id/test_video_id", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -102,7 +186,7 @@ func TestGetMarksHandlerWithUserID(t *testing.T) {
 
 func TestAddAnnotationHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -113,7 +197,7 @@ func TestAddAnnotationHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	body := bytes.NewBufferString(`{"markId":"` + mark.ID.Hex() + `","content":"Test Annotation"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/marks/"+mark.ID.Hex()+"/annotations", body)
@@ -131,7 +215,7 @@ func TestAddAnnotationHandler(t *testing.T) {
 
 func TestGetAnnotationsHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -142,13 +226,13 @@ func TestGetAnnotationsHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	annotation := model.Annotation{
 		MarkID:  mark.ID,
 		Content: "Test Annotation",
 	}
-	markService.AddAnnotation(context.Background(), &annotation)
+	testMarkService.AddAnnotation(context.Background(), &annotation)
 
 	req, _ := http.NewRequest("GET", "/api/v1/marks/"+mark.ID.Hex()+"/annotations", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -163,7 +247,7 @@ func TestGetAnnotationsHandler(t *testing.T) {
 
 func TestAddNoteHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -184,7 +268,7 @@ func TestAddNoteHandler(t *testing.T) {
 
 func TestGetNotesHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -195,7 +279,7 @@ func TestGetNotesHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Note",
 	}
-	markService.AddNote(context.Background(), &note)
+	testMarkService.AddNote(context.Background(), &note)
 
 	req, _ := http.NewRequest("GET", "/api/v1/notes/test_user_id/test_video_id", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -210,7 +294,7 @@ func TestGetNotesHandler(t *testing.T) {
 
 func TestExportMarksHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -221,7 +305,7 @@ func TestExportMarksHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	req, _ := http.NewRequest("GET", "/api/v1/videos/export/test_user_id/test_video_id", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -237,7 +321,7 @@ func TestExportMarksHandler(t *testing.T) {
 // 添加新的测试用例
 func TestUpdateMarkHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -248,7 +332,7 @@ func TestUpdateMarkHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	body := bytes.NewBufferString(`{"content":"Updated Mark"}`)
 	req, _ := http.NewRequest("PUT", "/api/v1/marks/test_user_id/test_video_id/"+mark.ID.Hex(), body)
@@ -266,7 +350,7 @@ func TestUpdateMarkHandler(t *testing.T) {
 
 func TestDeleteMarkHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -277,7 +361,7 @@ func TestDeleteMarkHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/marks/test_user_id/test_video_id/"+mark.ID.Hex(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -292,7 +376,7 @@ func TestDeleteMarkHandler(t *testing.T) {
 
 func TestUpdateAnnotationHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -303,13 +387,13 @@ func TestUpdateAnnotationHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	annotation := model.Annotation{
 		MarkID:  mark.ID,
 		Content: "Test Annotation",
 	}
-	markService.AddAnnotation(context.Background(), &annotation)
+	testMarkService.AddAnnotation(context.Background(), &annotation)
 
 	body := bytes.NewBufferString(`{"content":"Updated Annotation"}`)
 	req, _ := http.NewRequest("PUT", "/api/v1/marks/test_user_id/test_video_id/annotations/"+annotation.ID.Hex(), body)
@@ -327,7 +411,7 @@ func TestUpdateAnnotationHandler(t *testing.T) {
 
 func TestDeleteAnnotationHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -338,13 +422,13 @@ func TestDeleteAnnotationHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Mark",
 	}
-	markService.AddMark(context.Background(), mark.UserID, &mark)
+	testMarkService.AddMark(context.Background(), mark.UserID, &mark)
 
 	annotation := model.Annotation{
 		MarkID:  mark.ID,
 		Content: "Test Annotation",
 	}
-	markService.AddAnnotation(context.Background(), &annotation)
+	testMarkService.AddAnnotation(context.Background(), &annotation)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/marks/test_user_id/test_video_id/annotations/"+annotation.ID.Hex(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -359,7 +443,7 @@ func TestDeleteAnnotationHandler(t *testing.T) {
 
 func TestUpdateNoteHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -370,7 +454,7 @@ func TestUpdateNoteHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Note",
 	}
-	markService.AddNote(context.Background(), &note)
+	testMarkService.AddNote(context.Background(), &note)
 
 	body := bytes.NewBufferString(`{"content":"Updated Note"}`)
 	req, _ := http.NewRequest("PUT", "/api/v1/notes/test_user_id/test_video_id/"+note.ID.Hex(), body)
@@ -388,7 +472,7 @@ func TestUpdateNoteHandler(t *testing.T) {
 
 func TestDeleteNoteHandler(t *testing.T) {
 	setupRouter()
-	cleanup := setupTestEnvironment(t)
+	cleanup := setupTest(t)
 	defer cleanup()
 
 	token := getTestToken(t)
@@ -399,7 +483,7 @@ func TestDeleteNoteHandler(t *testing.T) {
 		Timestamp: 123.45,
 		Content:   "Test Note",
 	}
-	markService.AddNote(context.Background(), &note)
+	testMarkService.AddNote(context.Background(), &note)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/notes/test_user_id/test_video_id/"+note.ID.Hex(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)

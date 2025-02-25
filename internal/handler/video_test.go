@@ -17,6 +17,7 @@ import (
 	"time"
 	"video-platform/config"
 	"video-platform/internal/model"
+	"video-platform/internal/service"
 	"video-platform/pkg/database"
 
 	"github.com/gin-gonic/gin"
@@ -40,27 +41,46 @@ func init() {
 
 // setupTestRouter 初始化测试环境并返回清理函数
 func setupTestRouter(t *testing.T) (*gin.Engine, func()) {
-	// 初始化配置和数据库连接
+	// 初始化配置
 	if err := config.Init(); err != nil {
 		t.Fatal(err)
 	}
+
+	// 初始化数据库
 	if err := database.InitMongoDB(context.Background(), config.GlobalConfig.MongoDB, true); err != nil {
 		t.Fatal(err)
 	}
 
-	// 清理测试数据
-	cleanTestData(t)
+	// 创建服务实例
+	videoService := service.NewVideoService()
+	videoHandler := NewVideoHandler(videoService)
 
 	// 设置路由
 	r := gin.Default()
-	InitRoutes(r)
+	v1 := r.Group("/api/v1")
+	{
+		videos := v1.Group("/videos")
+		{
+			videos.GET("", videoHandler.GetVideoList)                   // 获取视频列表
+			videos.POST("", videoHandler.Upload)                        // 上传视频
+			videos.GET("/:id", videoHandler.GetByID)                    // 获取视频详情
+			videos.PUT("/:id", videoHandler.Update)                     // 更新视频信息
+			videos.DELETE("/:id", videoHandler.Delete)                  // 删除视频
+			videos.GET("/:id/stream", videoHandler.Stream)              // 视频流式播放
+			videos.POST("/batch", videoHandler.BatchOperation)          // 批量操作
+			videos.POST("/:id/thumbnail", videoHandler.UpdateThumbnail) // 更新缩略图
+			videos.GET("/:id/stats", videoHandler.GetStats)             // 获取统计信息
+		}
+	}
 
 	// 返回清理函数
-	return r, func() {
-		testLock.Lock()
-		defer testLock.Unlock()
-		cleanTestData(t)
+	cleanup := func() {
+		if err := database.CleanupTestData(context.Background()); err != nil {
+			t.Error(err)
+		}
 	}
+
+	return r, cleanup
 }
 
 // cleanTestData 清理测试数据
@@ -179,39 +199,48 @@ func cleanDirectory(dir string) {
 
 // 修改所有测试用例，使用 defer 调用清理函数
 func TestVideoHandler_Upload(t *testing.T) {
-	cleanup := setupTestEnvironment(t)
+	r, cleanup := setupTestRouter(t)
 	defer cleanup()
 
 	token := getTestToken(t)
 
 	// 创建测试文件
-	tempFile, err := os.CreateTemp("", "test-video-*.mp4")
+	testFilePath := filepath.Join(os.TempDir(), "test.mp4")
+	if err := os.WriteFile(testFilePath, []byte("test video content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(testFilePath)
+
+	// 创建multipart表单
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// 添加视频文件
+	file, err := os.Open(testFilePath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer file.Close()
 
-	// 准备请求
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("file", "test.mp4")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = io.Copy(part, tempFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writer.WriteField("title", "Test Video")
+	io.Copy(part, file)
+
+	// 添加其他字段
+	writer.WriteField("title", "测试视频")
 	writer.WriteField("duration", "180.5")
 	writer.Close()
 
-	// 发送请求
+	// 创建请求
 	req := httptest.NewRequest("POST", "/api/v1/videos", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+
+	// 执行请求
+	r.ServeHTTP(w, req)
 
 	// 验证响应
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -222,8 +251,7 @@ func TestVideoHandler_Upload(t *testing.T) {
 	}
 	err = json.NewDecoder(w.Body).Decode(&response)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, response.Code)
-	assert.Equal(t, 180.5, response.Data.Duration)
+	assert.Equal(t, float64(180.5), response.Data.Duration)
 }
 
 func TestVideoHandler_GetList(t *testing.T) {

@@ -4,346 +4,231 @@ import (
 	"net/http"
 	"video-platform/internal/model"
 	"video-platform/internal/service"
+	"video-platform/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var markService = service.NewMarkService()
+type MarkHandler struct {
+	markService service.MarkService
+}
+
+func NewMarkHandler(markService service.MarkService) *MarkHandler {
+	if markService == nil {
+		markService = service.NewMarkService()
+	}
+	return &MarkHandler{
+		markService: markService,
+	}
+}
 
 // AddMark 添加标记
-func AddMark(c *gin.Context) {
+func (h *MarkHandler) AddMark(c *gin.Context) {
 	userID := c.Param("userId")
 	var mark model.Mark
 	if err := c.ShouldBindJSON(&mark); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求",
-			"data": nil,
-		})
+		response.Fail(c, http.StatusBadRequest, "无效的请求")
 		return
 	}
-	if err := markService.AddMark(c.Request.Context(), userID, &mark); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "添加标记失败",
-			"data": nil,
-		})
+
+	if err := h.markService.AddMark(c.Request.Context(), userID, &mark); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "添加标记失败")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": mark,
-	})
+
+	response.Success(c, mark)
 }
 
 // GetMarks 获取标记列表
-func GetMarks(c *gin.Context) {
+func (h *MarkHandler) GetMarks(c *gin.Context) {
 	userID := c.Param("userId")
 	videoID := c.Param("id")
-	marks, err := markService.GetMarks(c.Request.Context(), userID, videoID)
+
+	marks, err := h.markService.GetMarks(c.Request.Context(), userID, videoID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "获取标记失败",
-			"data": nil,
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": marks,
-	})
-}
-
-// AddAnnotation 添加注释
-func AddAnnotation(c *gin.Context) {
-	var annotation model.Annotation
-	if err := c.ShouldBindJSON(&annotation); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求",
-			"data": nil,
-		})
-		return
-	}
-	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
-	userID := c.Param("userId")
-	annotation.UserID = userID
-	annotation.MarkID = markID
-	if err := markService.AddAnnotation(c.Request.Context(), &annotation); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "添加注释失败",
-			"data": nil,
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": annotation,
-	})
-}
-
-// GetAnnotations 获取注释
-func GetAnnotations(c *gin.Context) {
-	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
-	annotations, err := markService.GetAnnotations(c.Request.Context(), markID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "获取注释失败",
-			"data": nil,
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": annotations,
-	})
-}
-
-// AddNote 添加笔记
-func AddNote(c *gin.Context) {
-	var note model.Note
-	if err := c.ShouldBindJSON(&note); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求",
-			"data": nil,
-		})
-		return
-	}
-	if err := markService.AddNote(c.Request.Context(), &note); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "添加笔记失败",
-			"data": nil,
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": note,
-	})
-}
-
-// GetNotes 获取笔记列表
-func GetNotes(c *gin.Context) {
-	videoID := c.Param("id")
-	notes, err := markService.GetNotes(c.Request.Context(), videoID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "获取笔记失败",
-			"data": nil,
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": notes,
-	})
-}
-
-// ExportMarks 导出标记、注释和笔记
-func ExportMarks(c *gin.Context) {
-	videoID := c.Param("id")
-	userID := c.Param("userId")
-
-	// 获取标记（包含注释）
-	marks, err := markService.GetMarks(c.Request.Context(), userID, videoID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "获取标记失败",
-			"data": nil,
-		})
+		response.Fail(c, http.StatusInternalServerError, "获取标记列表失败")
 		return
 	}
 
-	// 获取笔记
-	notes, err := markService.GetNotes(c.Request.Context(), videoID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "获取笔记失败",
-			"data": nil,
-		})
-		return
-	}
-
-	// 构建导出数据
-	exportData := gin.H{
-		"marks": marks,
-		"notes": notes,
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": exportData,
-	})
+	response.Success(c, marks)
 }
 
 // UpdateMark 更新标记
-func UpdateMark(c *gin.Context) {
+func (h *MarkHandler) UpdateMark(c *gin.Context) {
 	userID := c.Param("userId")
 	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
 
 	var mark model.Mark
 	if err := c.ShouldBindJSON(&mark); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求",
-			"data": nil,
-		})
+		response.Fail(c, http.StatusBadRequest, "无效的请求")
 		return
 	}
 
-	if err := markService.UpdateMark(c.Request.Context(), userID, markID, &mark); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "更新标记失败",
-			"data": nil,
-		})
+	if err := h.markService.UpdateMark(c.Request.Context(), userID, markID, &mark); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "更新标记失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": mark,
-	})
+	response.Success(c, nil)
 }
 
 // DeleteMark 删除标记
-func DeleteMark(c *gin.Context) {
+func (h *MarkHandler) DeleteMark(c *gin.Context) {
 	userID := c.Param("userId")
 	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
 
-	if err := markService.DeleteMark(c.Request.Context(), userID, markID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "删除标记失败",
-			"data": nil,
-		})
+	if err := h.markService.DeleteMark(c.Request.Context(), userID, markID); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "删除标记失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": nil,
-	})
+	response.Success(c, nil)
+}
+
+// AddAnnotation 添加注释
+func (h *MarkHandler) AddAnnotation(c *gin.Context) {
+	userID := c.Param("userId")
+	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
+
+	var annotation model.Annotation
+	if err := c.ShouldBindJSON(&annotation); err != nil {
+		response.Fail(c, http.StatusBadRequest, "无效的请求")
+		return
+	}
+
+	annotation.UserID = userID
+	annotation.MarkID = markID
+
+	if err := h.markService.AddAnnotation(c.Request.Context(), &annotation); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "添加注释失败")
+		return
+	}
+
+	response.Success(c, annotation)
+}
+
+// GetAnnotations 获取注释列表
+func (h *MarkHandler) GetAnnotations(c *gin.Context) {
+	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
+
+	annotations, err := h.markService.GetAnnotations(c.Request.Context(), markID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "获取注释列表失败")
+		return
+	}
+
+	response.Success(c, annotations)
 }
 
 // UpdateAnnotation 更新注释
-func UpdateAnnotation(c *gin.Context) {
+func (h *MarkHandler) UpdateAnnotation(c *gin.Context) {
 	userID := c.Param("userId")
 	annotationID, _ := primitive.ObjectIDFromHex(c.Param("annotationId"))
 
 	var annotation model.Annotation
 	if err := c.ShouldBindJSON(&annotation); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求",
-			"data": nil,
-		})
+		response.Fail(c, http.StatusBadRequest, "无效的请求")
 		return
 	}
 
-	if err := markService.UpdateAnnotation(c.Request.Context(), userID, annotationID, &annotation); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "更新注释失败",
-			"data": nil,
-		})
+	if err := h.markService.UpdateAnnotation(c.Request.Context(), userID, annotationID, &annotation); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "更新注释失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": annotation,
-	})
+	response.Success(c, nil)
 }
 
 // DeleteAnnotation 删除注释
-func DeleteAnnotation(c *gin.Context) {
+func (h *MarkHandler) DeleteAnnotation(c *gin.Context) {
 	userID := c.Param("userId")
 	annotationID, _ := primitive.ObjectIDFromHex(c.Param("annotationId"))
 
-	if err := markService.DeleteAnnotation(c.Request.Context(), userID, annotationID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "删除注释失败",
-			"data": nil,
-		})
+	if err := h.markService.DeleteAnnotation(c.Request.Context(), userID, annotationID); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "删除注释失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": nil,
+	response.Success(c, nil)
+}
+
+// AddNote 添加笔记
+func (h *MarkHandler) AddNote(c *gin.Context) {
+	var note model.Note
+	if err := c.ShouldBindJSON(&note); err != nil {
+		response.Fail(c, http.StatusBadRequest, "无效的请求")
+		return
+	}
+	if err := h.markService.AddNote(c.Request.Context(), &note); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "添加笔记失败")
+		return
+	}
+	response.Success(c, note)
+}
+
+// GetNotes 获取笔记列表
+func (h *MarkHandler) GetNotes(c *gin.Context) {
+	videoID := c.Param("id")
+	notes, err := h.markService.GetNotes(c.Request.Context(), videoID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "获取笔记失败")
+		return
+	}
+	response.Success(c, notes)
+}
+
+// ExportMarks 导出标记、注释和笔记
+func (h *MarkHandler) ExportMarks(c *gin.Context) {
+	videoID := c.Param("id")
+	userID := c.Param("userId")
+
+	marks, err := h.markService.GetMarks(c.Request.Context(), userID, videoID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "获取标记失败")
+		return
+	}
+
+	notes, err := h.markService.GetNotes(c.Request.Context(), videoID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "获取笔记失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"marks": marks,
+		"notes": notes,
 	})
 }
 
 // UpdateNote 更新笔记
-func UpdateNote(c *gin.Context) {
+func (h *MarkHandler) UpdateNote(c *gin.Context) {
 	userID := c.Param("userId")
 	noteID, _ := primitive.ObjectIDFromHex(c.Param("noteId"))
 
 	var note model.Note
 	if err := c.ShouldBindJSON(&note); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 1,
-			"msg":  "无效的请求",
-			"data": nil,
-		})
+		response.Fail(c, http.StatusBadRequest, "无效的请求")
 		return
 	}
 
-	if err := markService.UpdateNote(c.Request.Context(), userID, noteID, &note); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "更新笔记失败",
-			"data": nil,
-		})
+	if err := h.markService.UpdateNote(c.Request.Context(), userID, noteID, &note); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "更新笔记失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": note,
-	})
+	response.Success(c, note)
 }
 
 // DeleteNote 删除笔记
-func DeleteNote(c *gin.Context) {
+func (h *MarkHandler) DeleteNote(c *gin.Context) {
 	userID := c.Param("userId")
 	noteID, _ := primitive.ObjectIDFromHex(c.Param("noteId"))
 
-	if err := markService.DeleteNote(c.Request.Context(), userID, noteID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 1,
-			"msg":  "删除笔记失败",
-			"data": nil,
-		})
+	if err := h.markService.DeleteNote(c.Request.Context(), userID, noteID); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "删除笔记失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "success",
-		"data": nil,
-	})
+	response.Success(c, nil)
 }

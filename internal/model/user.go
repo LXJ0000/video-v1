@@ -27,4 +27,12 @@ type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=32"`
 	Password string `json:"password" binding:"required,min=6,max=32"`
 	Email    string `json:"email" binding:"required,email"`
+}
+
+// UserProfile 用户资料
+type UserProfile struct {
+	Nickname    string    `json:"nickname" bson:"nickname"`
+	Avatar      string    `json:"avatar" bson:"avatar"`
+	Description string    `json:"description" bson:"description"`
+	UpdatedAt   time.Time `json:"updated_at" bson:"updated_at"`
 } 
