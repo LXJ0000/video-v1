@@ -83,3 +83,45 @@ func (s *MarkService) GetNotes(ctx context.Context, videoID string) ([]model.Not
 	}
 	return notes, nil
 }
+
+// UpdateMark 更新标记
+func (s *MarkService) UpdateMark(ctx context.Context, userID string, markID primitive.ObjectID, mark *model.Mark) error {
+	collection := database.GetCollection("marks")
+	_, err := collection.UpdateOne(ctx, gin.H{"_id": markID, "user_id": userID}, gin.H{"$set": mark})
+	return err
+}
+
+// DeleteMark 删除标记
+func (s *MarkService) DeleteMark(ctx context.Context, userID string, markID primitive.ObjectID) error {
+	collection := database.GetCollection("marks")
+	_, err := collection.DeleteOne(ctx, gin.H{"_id": markID, "user_id": userID})
+	return err
+}
+
+// UpdateAnnotation 更新注释
+func (s *MarkService) UpdateAnnotation(ctx context.Context, userID string, annotationID primitive.ObjectID, annotation *model.Annotation) error {
+	collection := database.GetCollection("annotations")
+	_, err := collection.UpdateOne(ctx, gin.H{"_id": annotationID, "user_id": userID}, gin.H{"$set": annotation})
+	return err
+}
+
+// DeleteAnnotation 删除注释
+func (s *MarkService) DeleteAnnotation(ctx context.Context, userID string, annotationID primitive.ObjectID) error {
+	collection := database.GetCollection("annotations")
+	_, err := collection.DeleteOne(ctx, gin.H{"_id": annotationID, "user_id": userID})
+	return err
+}
+
+// UpdateNote 更新笔记
+func (s *MarkService) UpdateNote(ctx context.Context, userID string, noteID primitive.ObjectID, note *model.Note) error {
+	collection := database.GetCollection("notes")
+	_, err := collection.UpdateOne(ctx, gin.H{"_id": noteID, "user_id": userID}, gin.H{"$set": note})
+	return err
+}
+
+// DeleteNote 删除笔记
+func (s *MarkService) DeleteNote(ctx context.Context, userID string, noteID primitive.ObjectID) error {
+	collection := database.GetCollection("notes")
+	_, err := collection.DeleteOne(ctx, gin.H{"_id": noteID, "user_id": userID})
+	return err
+}

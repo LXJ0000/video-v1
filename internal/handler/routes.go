@@ -38,15 +38,21 @@ func InitRoutes(r *gin.Engine) {
 			{
 				marks.POST("", AddMark)                          // 添加标记
 				marks.GET("", GetMarks)                          // 获取标记列表
+				marks.PUT("/:markId", UpdateMark)                // 更新标记
+				marks.DELETE("/:markId", DeleteMark)             // 删除标记
 				marks.POST("/annotations/:markId", AddAnnotation) // 添加注释
 				marks.GET("/annotations/:markId", GetAnnotations) // 获取注释
+				marks.PUT("/annotations/:annotationId", UpdateAnnotation) // 更新注释
+				marks.DELETE("/annotations/:annotationId", DeleteAnnotation) // 删除注释
 			}
 
 			// 笔记相关路由
 			notes := v1.Group("/notes/:userId/:id")
 			{
-				notes.POST("", AddNote) // 添加笔记
-				notes.GET("", GetNotes) // 获取笔记列表
+				notes.POST("", AddNote)           // 添加笔记
+				notes.GET("", GetNotes)           // 获取笔记列表
+				notes.PUT("/:noteId", UpdateNote) // 更新笔记
+				notes.DELETE("/:noteId", DeleteNote) // 删除笔记
 			}
 
 			// 导出相关路由
