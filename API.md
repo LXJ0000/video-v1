@@ -803,6 +803,42 @@
 }
 ```
 
+## 数据管理
+
+### 数据清理
+平台提供数据库清理工具，用于维护和清理历史数据。
+
+#### 清理范围
+- 视频数据（videos）
+- 标记数据（marks）
+- 注释数据（annotations）
+- 笔记数据（notes）
+
+#### 清理策略
+1. 时间策略
+   - 可以清理指定天数前的数据
+   - 默认清理30天前的数据
+
+2. 数据类型
+   - 可以选择清理特定类型的数据
+   - 支持清理所有类型数据
+
+3. 测试数据
+   - 支持只清理测试数据（user_id 以 "test_" 开头）
+
+#### 使用建议
+1. 定期清理
+   - 建议每月清理一次30天前的数据
+   - 可以通过 cron 任务自动执行
+
+2. 数据备份
+   - 清理前确保重要数据已备份
+   - 可以使用 MongoDB 的备份工具
+
+3. 执行时间
+   - 建议在系统负载较低时执行
+   - 可以分批次清理不同类型的数据
+
 ## 错误码说明
 - 400: 请求参数错误
 - 401: 未授权
@@ -865,4 +901,107 @@
 状态转换规则：
 - 任何状态都可以互相转换
 - 只有视频作者可以更改状态
-- 批量操作时会验证每个视频的权限 
+- 批量操作时会验证每个视频的权限
+
+## 用户系统 API
+
+### 用户注册
+#### 请求
+- **方法**: `POST`
+- **路径**: `/api/v1/users/register`
+- **Content-Type**: `application/json`
+- **请求参数**:
+  ```json
+  {
+    "username": "string",  // 用户名，3-32个字符
+    "password": "string",  // 密码，6-32个字符
+    "email": "string"     // 邮箱地址
+  }
+  ```
+
+#### 响应
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "id": "string",
+    "username": "string",
+    "email": "string",
+    "createdAt": "string",
+    "updatedAt": "string"
+  }
+}
+```
+
+### 用户登录
+#### 请求
+- **方法**: `POST`
+- **路径**: `/api/v1/users/login`
+- **Content-Type**: `application/json`
+- **请求参数**:
+  ```json
+  {
+    "username": "string",  // 用户名
+    "password": "string"   // 密码
+  }
+  ```
+
+#### 响应
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "user": {
+      "id": "string",
+      "username": "string",
+      "email": "string",
+      "createdAt": "string",
+      "updatedAt": "string"
+    },
+    "token": "string"  // JWT token
+  }
+}
+```
+
+### 认证说明
+1. Token 格式
+   - 使用 JWT (JSON Web Token)
+   - 有效期：24小时
+   - 格式：`Bearer <token>`
+
+2. 认证方式
+   - 在请求头中添加 Authorization
+   - 示例：`Authorization: Bearer eyJhbGciOiJIUzI1NiIs...`
+
+3. Token 使用
+   - 所有需要认证的 API 都需要在请求头中携带 token
+   - token 过期需要重新登录获取
+   - 无效的 token 会返回 401 错误
+
+4. 用户状态
+   - 正常（status: 1）：可以正常使用所有功能
+   - 禁用（status: 2）：无法登录和使用功能
+
+5. 安全建议
+   - 密码要求：至少6位，包含字母和数字
+   - 建议使用 HTTPS 传输
+   - 定期更换密码
+   - 不要在客户端明文存储 token
+
+### 错误处理
+1. 注册相关错误
+   - 用户名已存在：`{"code": 1, "msg": "用户名已存在"}`
+   - 邮箱已注册：`{"code": 1, "msg": "邮箱已注册"}`
+   - 密码不符合要求：`{"code": 1, "msg": "密码不符合要求"}`
+
+2. 登录相关错误
+   - 用户不存在：`{"code": 1, "msg": "用户不存在"}`
+   - 密码错误：`{"code": 1, "msg": "密码错误"}`
+   - 账号被禁用：`{"code": 1, "msg": "账号已被禁用"}`
+
+3. 认证相关错误
+   - token 无效：`{"code": 1, "msg": "无效的token"}`
+   - token 过期：`{"code": 1, "msg": "token已过期"}`
+   - 未授权访问：`{"code": 1, "msg": "未授权"}` 
