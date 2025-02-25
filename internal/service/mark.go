@@ -37,6 +37,18 @@ func (s *MarkService) GetMarks(ctx context.Context, userID string, videoID strin
 	if err := cursor.All(ctx, &marks); err != nil {
 		return nil, err
 	}
+
+	// 获取每个标记对应的注释
+	for i := range marks {
+		annotations, err := s.GetAnnotations(ctx, marks[i].ID)
+		if err != nil {
+			// 如果获取注释失败，不影响标记的返回，只是该标记的注释为空
+			marks[i].Annotations = []model.Annotation{}
+			continue
+		}
+		marks[i].Annotations = annotations
+	}
+
 	return marks, nil
 }
 

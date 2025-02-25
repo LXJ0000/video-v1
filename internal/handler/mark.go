@@ -70,6 +70,8 @@ func AddAnnotation(c *gin.Context) {
 		return
 	}
 	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
+	userID := c.Param("userId")
+	annotation.UserID = userID
 	annotation.MarkID = markID
 	if err := markService.AddAnnotation(c.Request.Context(), &annotation); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -155,7 +157,7 @@ func ExportMarks(c *gin.Context) {
 	videoID := c.Param("id")
 	userID := c.Param("userId")
 
-	// 获取标记
+	// 获取标记（包含注释）
 	marks, err := markService.GetMarks(c.Request.Context(), userID, videoID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -166,19 +168,21 @@ func ExportMarks(c *gin.Context) {
 		return
 	}
 
-	// 获取注释和笔记
-	var annotations []model.Annotation
-	var notes []model.Note
-	for _, mark := range marks {
-		annotations, _ = markService.GetAnnotations(c.Request.Context(), mark.ID)
-		notes, _ = markService.GetNotes(c.Request.Context(), videoID)
+	// 获取笔记
+	notes, err := markService.GetNotes(c.Request.Context(), videoID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": 1,
+			"msg":  "获取笔记失败",
+			"data": nil,
+		})
+		return
 	}
 
 	// 构建导出数据
 	exportData := gin.H{
-		"marks":       marks,
-		"annotations": annotations,
-		"notes":       notes,
+		"marks": marks,
+		"notes": notes,
 	}
 
 	c.JSON(http.StatusOK, gin.H{

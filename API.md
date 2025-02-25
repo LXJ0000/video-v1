@@ -333,17 +333,17 @@
 - **路径**: `/marks/:userId/:id`
 - **Content-Type**: `application/json`
 - **请求体**:
-````json
+```json
 {
   "videoId": "test_video_id",
   "timestamp": 123.45,
   "content": "Test Mark"
 }
-````
+```
 
 #### 响应
 ##### 成功响应
-````json
+```json
 {
   "code": 0,
   "msg": "success",
@@ -356,16 +356,16 @@
     "createdAt": "2024-01-20T10:00:00Z"
   }
 }
-````
+```
 
 ##### 失败响应
-````json
+```json
 {
   "code": 1,
   "msg": "添加标记失败",
   "data": null
 }
-````
+```
 
 ### 11. 获取标记列表
 #### 请求
@@ -374,7 +374,7 @@
 
 #### 响应
 ##### 成功响应
-````json
+```json
 {
   "code": 0,
   "msg": "success",
@@ -385,105 +385,245 @@
       "videoId": "test_video_id",
       "timestamp": 123.45,
       "content": "Test Mark",
-      "createdAt": "2024-01-20T10:00:00Z"
+      "annotations": [
+        {
+          "id": "注释ID",
+          "userId": "test_user_id",
+          "markId": "标记ID",
+          "content": "Test Annotation",
+          "createdAt": "2024-01-20T10:00:00Z",
+          "updatedAt": "2024-01-20T10:00:00Z"
+        }
+      ],
+      "createdAt": "2024-01-20T10:00:00Z",
+      "updatedAt": "2024-01-20T10:00:00Z"
     }
   ]
 }
-````
+```
 
 ##### 失败响应
-````json
+```json
 {
   "code": 1,
-  "msg": "没有找到标记",
+  "msg": "获取标记失败",
   "data": null
 }
-````
+```
 
-### 12. 添加注释
+### 12. 更新标记
 #### 请求
-- **方法**: `POST`
-- **路径**: `/marks/:markId/annotations`
+- **方法**: `PUT`
+- **路径**: `/marks/:userId/:id/:markId`
 - **Content-Type**: `application/json`
 - **请求体**:
-````json
+```json
 {
-  "content": "Test Annotation"
+  "content": "Updated Mark",
+  "timestamp": 124.5
 }
-````
+```
 
 #### 响应
 ##### 成功响应
-````json
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "id": "标记ID",
+    "userId": "test_user_id",
+    "videoId": "test_video_id",
+    "timestamp": 124.5,
+    "content": "Updated Mark",
+    "createdAt": "2024-01-20T10:00:00Z"
+  }
+}
+```
+
+##### 失败响应
+```json
+{
+  "code": 1,
+  "msg": "更新标记失败",
+  "data": null
+}
+```
+
+### 13. 删除标记
+#### 请求
+- **方法**: `DELETE`
+- **路径**: `/marks/:userId/:id/:markId`
+
+#### 响应
+##### 成功响应
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": null
+}
+```
+
+##### 失败响应
+```json
+{
+  "code": 1,
+  "msg": "删除标记失败",
+  "data": null
+}
+```
+
+### 14. 添加注释
+#### 请求
+- **方法**: `POST`
+- **路径**: `/marks/:userId/:id/annotations/:markId`
+- **Content-Type**: `application/json`
+- **请求体**:
+```json
+{
+  "content": "Test Annotation"
+}
+```
+
+#### 响应
+##### 成功响应
+```json
 {
   "code": 0,
   "msg": "success",
   "data": {
     "id": "注释ID",
+    "userId": "test_user_id",
     "markId": "标记ID",
     "content": "Test Annotation",
-    "createdAt": "2024-01-20T10:00:00Z"
+    "createdAt": "2024-01-20T10:00:00Z",
+    "updatedAt": "2024-01-20T10:00:00Z"
   }
 }
-````
+```
 
 ##### 失败响应
-````json
+```json
 {
   "code": 1,
   "msg": "添加注释失败",
   "data": null
 }
-````
+```
 
-### 13. 获取注释
+### 15. 获取注释
 #### 请求
 - **方法**: `GET`
-- **路径**: `/marks/:markId/annotations`
+- **路径**: `/marks/:userId/:id/annotations/:markId`
 
 #### 响应
 ##### 成功响应
-````json
+```json
 {
   "code": 0,
   "msg": "success",
   "data": [
     {
       "id": "注释ID",
+      "userId": "test_user_id",
       "markId": "标记ID",
       "content": "Test Annotation",
-      "createdAt": "2024-01-20T10:00:00Z"
+      "createdAt": "2024-01-20T10:00:00Z",
+      "updatedAt": "2024-01-20T10:00:00Z"
     }
   ]
 }
-````
+```
 
 ##### 失败响应
-````json
+```json
 {
   "code": 1,
-  "msg": "没有找到注释",
+  "msg": "获取注释失败",
   "data": null
 }
-````
+```
 
-### 14. 添加笔记
+### 16. 更新注释
+#### 请求
+- **方法**: `PUT`
+- **路径**: `/marks/:userId/:id/annotations/:annotationId`
+- **Content-Type**: `application/json`
+- **请求体**:
+```json
+{
+  "content": "Updated Annotation"
+}
+```
+
+#### 响应
+##### 成功响应
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "id": "注释ID",
+    "userId": "test_user_id",
+    "markId": "标记ID",
+    "content": "Updated Annotation",
+    "createdAt": "2024-01-20T10:00:00Z",
+    "updatedAt": "2024-01-20T10:30:00Z"
+  }
+}
+```
+
+##### 失败响应
+```json
+{
+  "code": 1,
+  "msg": "更新注释失败",
+  "data": null
+}
+```
+
+### 17. 删除注释
+#### 请求
+- **方法**: `DELETE`
+- **路径**: `/marks/:userId/:id/annotations/:annotationId`
+
+#### 响应
+##### 成功响应
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": null
+}
+```
+
+##### 失败响应
+```json
+{
+  "code": 1,
+  "msg": "删除注释失败",
+  "data": null
+}
+```
+
+### 18. 添加笔记
 #### 请求
 - **方法**: `POST`
 - **路径**: `/notes/:userId/:id`
 - **Content-Type**: `application/json`
 - **请求体**:
-````json
+```json
 {
   "videoId": "test_video_id",
   "timestamp": 123.45,
   "content": "Test Note"
 }
-````
+```
 
 #### 响应
 ##### 成功响应
-````json
+```json
 {
   "code": 0,
   "msg": "success",
@@ -493,28 +633,29 @@
     "videoId": "test_video_id",
     "timestamp": 123.45,
     "content": "Test Note",
-    "createdAt": "2024-01-20T10:00:00Z"
+    "createdAt": "2024-01-20T10:00:00Z",
+    "updatedAt": "2024-01-20T10:00:00Z"
   }
 }
-````
+```
 
 ##### 失败响应
-````json
+```json
 {
   "code": 1,
   "msg": "添加笔记失败",
   "data": null
 }
-````
+```
 
-### 15. 获取笔记列表
+### 19. 获取笔记列表
 #### 请求
 - **方法**: `GET`
 - **路径**: `/notes/:userId/:id`
 
 #### 响应
 ##### 成功响应
-````json
+```json
 {
   "code": 0,
   "msg": "success",
@@ -525,29 +666,94 @@
       "videoId": "test_video_id",
       "timestamp": 123.45,
       "content": "Test Note",
-      "createdAt": "2024-01-20T10:00:00Z"
+      "createdAt": "2024-01-20T10:00:00Z",
+      "updatedAt": "2024-01-20T10:00:00Z"
     }
   ]
 }
-````
+```
 
 ##### 失败响应
-````json
+```json
 {
   "code": 1,
-  "msg": "没有找到笔记",
+  "msg": "获取笔记失败",
   "data": null
 }
-````
+```
 
-### 16. 导出标记、注释和笔记
+### 20. 更新笔记
+#### 请求
+- **方法**: `PUT`
+- **路径**: `/notes/:userId/:id/:noteId`
+- **Content-Type**: `application/json`
+- **请求体**:
+```json
+{
+  "content": "Updated Note",
+  "timestamp": 124.5
+}
+```
+
+#### 响应
+##### 成功响应
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "id": "笔记ID",
+    "userId": "test_user_id",
+    "videoId": "test_video_id",
+    "timestamp": 124.5,
+    "content": "Updated Note",
+    "createdAt": "2024-01-20T10:00:00Z",
+    "updatedAt": "2024-01-20T10:30:00Z"
+  }
+}
+```
+
+##### 失败响应
+```json
+{
+  "code": 1,
+  "msg": "更新笔记失败",
+  "data": null
+}
+```
+
+### 21. 删除笔记
+#### 请求
+- **方法**: `DELETE`
+- **路径**: `/notes/:userId/:id/:noteId`
+
+#### 响应
+##### 成功响应
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": null
+}
+```
+
+##### 失败响应
+```json
+{
+  "code": 1,
+  "msg": "删除笔记失败",
+  "data": null
+}
+```
+
+### 22. 导出标记、注释和笔记
 #### 请求
 - **方法**: `GET`
 - **路径**: `/videos/export/:userId/:id`
 
 #### 响应
 ##### 成功响应
-````json
+```json
 {
   "code": 0,
   "msg": "success",
@@ -558,14 +764,19 @@
         "userId": "test_user_id",
         "videoId": "test_video_id",
         "timestamp": 123.45,
-        "content": "Test Mark"
-      }
-    ],
-    "annotations": [
-      {
-        "id": "注释ID",
-        "markId": "标记ID",
-        "content": "Test Annotation"
+        "content": "Test Mark",
+        "annotations": [
+          {
+            "id": "注释ID",
+            "userId": "test_user_id",
+            "markId": "标记ID",
+            "content": "Test Annotation",
+            "createdAt": "2024-01-20T10:00:00Z",
+            "updatedAt": "2024-01-20T10:00:00Z"
+          }
+        ],
+        "createdAt": "2024-01-20T10:00:00Z",
+        "updatedAt": "2024-01-20T10:00:00Z"
       }
     ],
     "notes": [
@@ -574,21 +785,23 @@
         "userId": "test_user_id",
         "videoId": "test_video_id",
         "timestamp": 123.45,
-        "content": "Test Note"
+        "content": "Test Note",
+        "createdAt": "2024-01-20T10:00:00Z",
+        "updatedAt": "2024-01-20T10:00:00Z"
       }
     ]
   }
 }
-````
+```
 
 ##### 失败响应
-````json
+```json
 {
   "code": 1,
   "msg": "导出失败",
   "data": null
 }
-````
+```
 
 ## 错误码说明
 - 400: 请求参数错误
