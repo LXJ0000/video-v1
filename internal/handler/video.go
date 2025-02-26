@@ -369,12 +369,17 @@ func (h *VideoHandler) GetVideoList(c *gin.Context) {
 		PageSize: pageSize,
 		UserID:   c.Query("userId"),  // 可选：指定用户的视频
 		Keyword:  c.Query("keyword"), // 可选：搜索关键词
-		Sort:     c.Query("sort"),    // 可选：排序方式
+		Sort:     c.Query("sortBy"),  // 修正排序字段名
+	}
+
+	// 处理排序方向
+	if order := c.Query("sortOrder"); order == "desc" {
+		opts.Sort = "-" + opts.Sort // 添加降序前缀
 	}
 
 	// 处理状态过滤
 	if status := c.Query("status"); status != "" {
-		opts.Status = strings.Split(status, ",")
+		opts.Status = []string{status} // 只使用单个状态，不再分割
 	}
 
 	// 3. 调用 service 获取视频列表

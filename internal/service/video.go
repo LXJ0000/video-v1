@@ -564,58 +564,30 @@ func (s *videoService) GetVideoList(ctx context.Context, currentUserID string, o
 		filter["user_id"] = opts.UserID
 	}
 
-	// 3. 处理状态过滤和权限检查
-	if currentUserID != "" {
-		if opts.UserID == "" {
-			// 已登录用户查看所有视频
-			if len(opts.Status) > 0 {
-				// 指定了状态：返回所有公开视频和自己的指定状态视频
-				filter["$or"] = []bson.M{
-					{"status": model.VideoStatusPublic},
-					{"user_id": currentUserID, "status": bson.M{"$in": opts.Status}},
-				}
-			} else {
-				// 未指定状态：返回所有公开视频和自己的所有视频
-				filter["$or"] = []bson.M{
-					{"status": model.VideoStatusPublic},
-					{"user_id": currentUserID},
-				}
-			}
-		} else if currentUserID == opts.UserID {
-			// 查看自己的视频
-			if len(opts.Status) > 0 {
-				// 指定了状态：只返回指定状态的视频
-				filter["status"] = bson.M{"$in": opts.Status}
-			}
-			// 未指定状态：返回所有状态的视频（不需要额外过滤）
+	// 3. 处理状态过滤
+	if len(opts.Status) > 0 {
+		if currentUserID != "" && (opts.UserID == "" || opts.UserID == currentUserID) {
+			// 已登录用户查看自己的视频：按指定状态过滤
+			filter["status"] = bson.M{"$in": opts.Status}
 		} else {
 			// 查看其他用户的视频：只能看到公开视频
 			filter["status"] = model.VideoStatusPublic
 		}
 	} else {
-		// 未登录用户只能看到公开视频
-		filter["status"] = model.VideoStatusPublic
+		// 未指定状态
+		if currentUserID != "" && (opts.UserID == "" || opts.UserID == currentUserID) {
+			// 已登录用户查看自己的视频：可以看到所有状态
+		} else {
+			// 查看其他用户的视频：只能看到公开视频
+			filter["status"] = model.VideoStatusPublic
+		}
 	}
 
 	// 4. 处理关键词搜索
 	if opts.Keyword != "" {
-		keywordFilter := bson.M{
-			"$or": []bson.M{
-				{"title": bson.M{"$regex": opts.Keyword, "$options": "i"}},
-				{"description": bson.M{"$regex": opts.Keyword, "$options": "i"}},
-			},
-		}
-
-		// 如果已经有 $or 条件，需要使用 $and 组合
-		if existingOr, hasOr := filter["$or"]; hasOr {
-			filter = bson.M{
-				"$and": []bson.M{
-					{"$or": existingOr.([]bson.M)},
-					keywordFilter,
-				},
-			}
-		} else {
-			filter["$or"] = keywordFilter["$or"]
+		filter["$or"] = []bson.M{
+			{"title": bson.M{"$regex": opts.Keyword, "$options": "i"}},
+			{"description": bson.M{"$regex": opts.Keyword, "$options": "i"}},
 		}
 	}
 
