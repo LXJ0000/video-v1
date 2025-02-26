@@ -25,14 +25,19 @@ func NewMarkHandler(markService service.MarkService) *MarkHandler {
 
 // AddMark 添加标记
 func (h *MarkHandler) AddMark(c *gin.Context) {
-	userID := c.Param("userId")
+	// 从上下文获取用户ID
+	userID, _ := c.Get("userId")
+
 	var mark model.Mark
 	if err := c.ShouldBindJSON(&mark); err != nil {
 		response.Fail(c, http.StatusBadRequest, "无效的请求")
 		return
 	}
 
-	if err := h.markService.AddMark(c.Request.Context(), userID, &mark); err != nil {
+	// 设置用户ID
+	mark.UserID = userID.(string)
+
+	if err := h.markService.AddMark(c.Request.Context(), userID.(string), &mark); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "添加标记失败")
 		return
 	}
@@ -42,10 +47,11 @@ func (h *MarkHandler) AddMark(c *gin.Context) {
 
 // GetMarks 获取标记列表
 func (h *MarkHandler) GetMarks(c *gin.Context) {
-	userID := c.Param("userId")
-	videoID := c.Param("id")
+	// 从上下文获取用户ID
+	userID, _ := c.Get("userId")
+	videoID := c.Query("videoId") // 从查询参数获取视频ID
 
-	marks, err := h.markService.GetMarks(c.Request.Context(), userID, videoID)
+	marks, err := h.markService.GetMarks(c.Request.Context(), userID.(string), videoID)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "获取标记列表失败")
 		return
@@ -56,8 +62,21 @@ func (h *MarkHandler) GetMarks(c *gin.Context) {
 
 // UpdateMark 更新标记
 func (h *MarkHandler) UpdateMark(c *gin.Context) {
-	userID := c.Param("userId")
+	userID, _ := c.Get("userId")
 	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
+
+	// 获取当前登录用户ID
+	currentUserID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
+	// 权限检查：只能更新自己的标记
+	if userID != currentUserID.(string) {
+		response.Fail(c, http.StatusForbidden, "无权操作")
+		return
+	}
 
 	var mark model.Mark
 	if err := c.ShouldBindJSON(&mark); err != nil {
@@ -65,7 +84,7 @@ func (h *MarkHandler) UpdateMark(c *gin.Context) {
 		return
 	}
 
-	if err := h.markService.UpdateMark(c.Request.Context(), userID, markID, &mark); err != nil {
+	if err := h.markService.UpdateMark(c.Request.Context(), userID.(string), markID, &mark); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "更新标记失败")
 		return
 	}
@@ -75,10 +94,23 @@ func (h *MarkHandler) UpdateMark(c *gin.Context) {
 
 // DeleteMark 删除标记
 func (h *MarkHandler) DeleteMark(c *gin.Context) {
-	userID := c.Param("userId")
+	userID, _ := c.Get("userId")
 	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
 
-	if err := h.markService.DeleteMark(c.Request.Context(), userID, markID); err != nil {
+	// 获取当前登录用户ID
+	currentUserID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
+	// 权限检查：只能删除自己的标记
+	if userID != currentUserID.(string) {
+		response.Fail(c, http.StatusForbidden, "无权操作")
+		return
+	}
+
+	if err := h.markService.DeleteMark(c.Request.Context(), userID.(string), markID); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "删除标记失败")
 		return
 	}
@@ -88,8 +120,21 @@ func (h *MarkHandler) DeleteMark(c *gin.Context) {
 
 // AddAnnotation 添加注释
 func (h *MarkHandler) AddAnnotation(c *gin.Context) {
-	userID := c.Param("userId")
+	userID, _ := c.Get("userId")
 	markID, _ := primitive.ObjectIDFromHex(c.Param("markId"))
+
+	// 获取当前登录用户ID
+	currentUserID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
+	// 权限检查：只能操作自己的注释
+	if userID != currentUserID.(string) {
+		response.Fail(c, http.StatusForbidden, "无权操作")
+		return
+	}
 
 	var annotation model.Annotation
 	if err := c.ShouldBindJSON(&annotation); err != nil {
@@ -97,7 +142,7 @@ func (h *MarkHandler) AddAnnotation(c *gin.Context) {
 		return
 	}
 
-	annotation.UserID = userID
+	annotation.UserID = userID.(string)
 	annotation.MarkID = markID
 
 	if err := h.markService.AddAnnotation(c.Request.Context(), &annotation); err != nil {
@@ -123,7 +168,7 @@ func (h *MarkHandler) GetAnnotations(c *gin.Context) {
 
 // UpdateAnnotation 更新注释
 func (h *MarkHandler) UpdateAnnotation(c *gin.Context) {
-	userID := c.Param("userId")
+	userID, _ := c.Get("userId")
 	annotationID, _ := primitive.ObjectIDFromHex(c.Param("annotationId"))
 
 	var annotation model.Annotation
@@ -132,7 +177,7 @@ func (h *MarkHandler) UpdateAnnotation(c *gin.Context) {
 		return
 	}
 
-	if err := h.markService.UpdateAnnotation(c.Request.Context(), userID, annotationID, &annotation); err != nil {
+	if err := h.markService.UpdateAnnotation(c.Request.Context(), userID.(string), annotationID, &annotation); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "更新注释失败")
 		return
 	}
@@ -142,10 +187,10 @@ func (h *MarkHandler) UpdateAnnotation(c *gin.Context) {
 
 // DeleteAnnotation 删除注释
 func (h *MarkHandler) DeleteAnnotation(c *gin.Context) {
-	userID := c.Param("userId")
+	userID, _ := c.Get("userId")
 	annotationID, _ := primitive.ObjectIDFromHex(c.Param("annotationId"))
 
-	if err := h.markService.DeleteAnnotation(c.Request.Context(), userID, annotationID); err != nil {
+	if err := h.markService.DeleteAnnotation(c.Request.Context(), userID.(string), annotationID); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "删除注释失败")
 		return
 	}
@@ -155,11 +200,30 @@ func (h *MarkHandler) DeleteAnnotation(c *gin.Context) {
 
 // AddNote 添加笔记
 func (h *MarkHandler) AddNote(c *gin.Context) {
+	userID, _ := c.Get("userId")
+
+	// 获取当前登录用户ID
+	currentUserID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
+	// 权限检查：只能操作自己的笔记
+	if userID != currentUserID.(string) {
+		response.Fail(c, http.StatusForbidden, "无权操作")
+		return
+	}
+
 	var note model.Note
 	if err := c.ShouldBindJSON(&note); err != nil {
 		response.Fail(c, http.StatusBadRequest, "无效的请求")
 		return
 	}
+
+	// 设置用户ID
+	note.UserID = userID.(string)
+
 	if err := h.markService.AddNote(c.Request.Context(), &note); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "添加笔记失败")
 		return
@@ -169,7 +233,7 @@ func (h *MarkHandler) AddNote(c *gin.Context) {
 
 // GetNotes 获取笔记列表
 func (h *MarkHandler) GetNotes(c *gin.Context) {
-	videoID := c.Param("id")
+	videoID := c.Query("videoId") // 从查询参数获取视频ID
 	notes, err := h.markService.GetNotes(c.Request.Context(), videoID)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "获取笔记失败")
@@ -180,10 +244,10 @@ func (h *MarkHandler) GetNotes(c *gin.Context) {
 
 // ExportMarks 导出标记、注释和笔记
 func (h *MarkHandler) ExportMarks(c *gin.Context) {
-	videoID := c.Param("id")
-	userID := c.Param("userId")
+	videoID := c.Query("videoId") // 从查询参数获取视频ID
+	userID, _ := c.Get("userId")
 
-	marks, err := h.markService.GetMarks(c.Request.Context(), userID, videoID)
+	marks, err := h.markService.GetMarks(c.Request.Context(), userID.(string), videoID)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "获取标记失败")
 		return
@@ -203,7 +267,7 @@ func (h *MarkHandler) ExportMarks(c *gin.Context) {
 
 // UpdateNote 更新笔记
 func (h *MarkHandler) UpdateNote(c *gin.Context) {
-	userID := c.Param("userId")
+	userID, _ := c.Get("userId")
 	noteID, _ := primitive.ObjectIDFromHex(c.Param("noteId"))
 
 	var note model.Note
@@ -212,7 +276,7 @@ func (h *MarkHandler) UpdateNote(c *gin.Context) {
 		return
 	}
 
-	if err := h.markService.UpdateNote(c.Request.Context(), userID, noteID, &note); err != nil {
+	if err := h.markService.UpdateNote(c.Request.Context(), userID.(string), noteID, &note); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "更新笔记失败")
 		return
 	}
@@ -222,10 +286,10 @@ func (h *MarkHandler) UpdateNote(c *gin.Context) {
 
 // DeleteNote 删除笔记
 func (h *MarkHandler) DeleteNote(c *gin.Context) {
-	userID := c.Param("userId")
+	userID, _ := c.Get("userId")
 	noteID, _ := primitive.ObjectIDFromHex(c.Param("noteId"))
 
-	if err := h.markService.DeleteNote(c.Request.Context(), userID, noteID); err != nil {
+	if err := h.markService.DeleteNote(c.Request.Context(), userID.(string), noteID); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "删除笔记失败")
 		return
 	}

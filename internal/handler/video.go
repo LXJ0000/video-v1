@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -32,6 +33,13 @@ func NewVideoHandler(videoService service.VideoService) *VideoHandler {
 
 // Upload 上传视频
 func (h *VideoHandler) Upload(c *gin.Context) {
+	// 获取当前用户ID
+	userID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
 	videoFile, err := c.FormFile("file")
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, "请选择要上传的视频文件")
@@ -52,6 +60,7 @@ func (h *VideoHandler) Upload(c *gin.Context) {
 	}
 
 	info := model.Video{
+		UserID:      userID.(string), // 设置用户ID
 		Title:       c.PostForm("title"),
 		Description: c.PostForm("description"),
 		Status:      c.PostForm("status"),
@@ -72,31 +81,6 @@ func (h *VideoHandler) Upload(c *gin.Context) {
 	response.Success(c, video)
 }
 
-// GetList 获取视频列表
-func (h *VideoHandler) GetList(c *gin.Context) {
-	var query model.VideoQuery
-	if err := c.ShouldBindQuery(&query); err != nil {
-		response.Fail(c, http.StatusBadRequest, "无效的查询参数")
-		return
-	}
-
-	// 设置默认值
-	if query.Page <= 0 {
-		query.Page = 1
-	}
-	if query.PageSize <= 0 {
-		query.PageSize = 10
-	}
-
-	list, err := h.videoService.GetList(c.Request.Context(), query)
-	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	response.Success(c, list)
-}
-
 // GetByID 获取视频详情
 func (h *VideoHandler) GetByID(c *gin.Context) {
 	id := c.Param("id")
@@ -111,14 +95,38 @@ func (h *VideoHandler) GetByID(c *gin.Context) {
 
 // Update 更新视频信息
 func (h *VideoHandler) Update(c *gin.Context) {
+	// 获取当前用户ID
+	userID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
 	id := c.Param("id")
-	var video model.Video
-	if err := c.ShouldBindJSON(&video); err != nil {
+
+	// 检查视频是否存在且属于当前用户
+	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, "视频不存在")
+		return
+	}
+
+	// 权限检查
+	if video.UserID != userID.(string) {
+		response.Fail(c, http.StatusForbidden, "无权操作此视频")
+		return
+	}
+
+	var updateData model.Video
+	if err := c.ShouldBindJSON(&updateData); err != nil {
 		response.Fail(c, http.StatusBadRequest, "无效的请求数据")
 		return
 	}
 
-	if err := h.videoService.Update(c.Request.Context(), id, video); err != nil {
+	// 设置用户ID，确保不会被修改
+	updateData.UserID = userID.(string)
+
+	if err := h.videoService.Update(c.Request.Context(), id, updateData); err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -128,7 +136,28 @@ func (h *VideoHandler) Update(c *gin.Context) {
 
 // Delete 删除视频
 func (h *VideoHandler) Delete(c *gin.Context) {
+	// 获取当前用户ID
+	userID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
 	id := c.Param("id")
+
+	// 检查视频是否存在且属于当前用户
+	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, "视频不存在")
+		return
+	}
+
+	// 权限检查
+	if video.UserID != userID.(string) {
+		response.Fail(c, http.StatusForbidden, "无权操作此视频")
+		return
+	}
+
 	if err := h.videoService.Delete(c.Request.Context(), id); err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
@@ -145,6 +174,19 @@ func (h *VideoHandler) Stream(c *gin.Context) {
 		response.Fail(c, http.StatusNotFound, "视频不存在")
 		return
 	}
+
+	// 权限检查：非公开视频只有作者可以观看
+	// if video.Status != model.VideoStatusPublic {
+	// 	// 获取当前用户ID
+	// 	userID, exists := c.Get("userId")
+	// 	if !exists || userID.(string) != video.UserID {
+	// 		response.Fail(c, http.StatusForbidden, "无权观看此视频")
+	// 		return
+	// 	}
+	// }
+
+	// 增加观看次数
+	go h.videoService.IncrementStats(context.Background(), id, "views")
 
 	filePath := filepath.Join(config.GlobalConfig.Storage.UploadDir, video.FileName)
 	file, err := os.Open(filePath)
@@ -232,11 +274,21 @@ func parseRange(rangeHeader string, size int64) ([][2]int64, error) {
 
 // BatchOperation 批量操作视频
 func (h *VideoHandler) BatchOperation(c *gin.Context) {
+	// 获取当前用户ID
+	userID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
 	var req model.BatchOperationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, "无效的请求数据")
 		return
 	}
+
+	// 设置用户ID，用于权限检查
+	req.UserID = userID.(string)
 
 	result, err := h.videoService.BatchOperation(c.Request.Context(), req)
 	if err != nil {
@@ -249,7 +301,28 @@ func (h *VideoHandler) BatchOperation(c *gin.Context) {
 
 // UpdateThumbnail 更新视频缩略图
 func (h *VideoHandler) UpdateThumbnail(c *gin.Context) {
+	// 获取当前用户ID
+	userID, exists := c.Get("userId")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, "未授权")
+		return
+	}
+
 	id := c.Param("id")
+
+	// 检查视频是否存在且属于当前用户
+	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, "视频不存在")
+		return
+	}
+
+	// 权限检查
+	if video.UserID != userID.(string) {
+		response.Fail(c, http.StatusForbidden, "无权操作此视频")
+		return
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, "请选择要上传的图片文件")
@@ -306,6 +379,41 @@ func (h *VideoHandler) GetVideoList(c *gin.Context) {
 
 	// 3. 调用 service 获取视频列表
 	videos, total, err := h.videoService.GetVideoList(c.Request.Context(), userIDStr, opts)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "获取视频列表失败")
+		return
+	}
+
+	// 4. 返回结果
+	response.Success(c, gin.H{
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+		"items":    videos,
+	})
+}
+
+// GetPublicVideoList 获取公开视频列表（无需认证）
+func (h *VideoHandler) GetPublicVideoList(c *gin.Context) {
+	// 1. 获取查询参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	if pageSize > 50 {
+		pageSize = 50
+	}
+
+	// 2. 构建查询选项
+	opts := service.ListOptions{
+		Page:     page,
+		PageSize: pageSize,
+		Status:   []string{"public"}, // 只获取公开视频
+		UserID:   c.Query("userId"),  // 可选：指定用户的公开视频
+		Keyword:  c.Query("keyword"), // 可选：搜索关键词
+		Sort:     c.Query("sort"),    // 可选：排序方式
+	}
+
+	// 3. 调用 service 获取视频列表（传入空的 currentUserID）
+	videos, total, err := h.videoService.GetVideoList(c.Request.Context(), "", opts)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "获取视频列表失败")
 		return

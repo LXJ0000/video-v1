@@ -71,9 +71,10 @@ type VideoQuery struct {
 
 // BatchOperationRequest 批量操作请求
 type BatchOperationRequest struct {
-	IDs    []string `json:"ids"`              // 视频ID列表
-	Action string   `json:"action"`           // 操作类型
-	Status string   `json:"status,omitempty"` // 状态（可选）
+	IDs     []string `json:"ids" binding:"required"`
+	Action  string   `json:"action" binding:"required"`
+	Status  string   `json:"status"`
+	UserID  string   `json:"-"` // 用于权限检查，不从请求中获取
 }
 
 // BatchOperationResult 批量操作结果

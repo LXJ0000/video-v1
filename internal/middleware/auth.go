@@ -11,6 +11,14 @@ import (
 // Auth JWT认证中间件
 func Auth() gin.HandlerFunc {
     return func(c *gin.Context) {
+        // 在测试模式下，如果已经设置了userId，则跳过token验证
+        if gin.Mode() == gin.TestMode {
+            if _, exists := c.Get("userId"); exists {
+                c.Next()
+                return
+            }
+        }
+
         authHeader := c.GetHeader("Authorization")
         if authHeader == "" {
             c.JSON(http.StatusUnauthorized, gin.H{

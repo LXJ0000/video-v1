@@ -155,6 +155,7 @@ func (s *videoService) Upload(ctx context.Context, videoFile *multipart.FileHead
 		CoverURL:    coverURL,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
+		UserID:      info.UserID,
 	}
 
 	// 保存到数据库
@@ -351,28 +352,75 @@ func (s *videoService) Delete(ctx context.Context, id string) error {
 	return os.Remove(filePath)
 }
 
-// BatchOperation 批量操作
+// BatchOperation 批量操作视频
 func (s *videoService) BatchOperation(ctx context.Context, req model.BatchOperationRequest) (*model.BatchOperationResult, error) {
 	result := &model.BatchOperationResult{
-		FailedIDs: make([]string, 0),
+		SuccessCount: 0,
+		FailedCount:  0,
+		FailedIDs:    []string{},
 	}
 
 	for _, id := range req.IDs {
-		var err error
-		switch req.Action {
-		case "delete":
-			err = s.Delete(ctx, id)
-		case "update_status":
-			err = s.Update(ctx, id, model.Video{Status: req.Status})
-		default:
-			return nil, errors.New("不支持的操作类型")
-		}
-
+		// 检查视频是否存在且属于当前用户
+		objectID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
 			result.FailedCount++
 			result.FailedIDs = append(result.FailedIDs, id)
-		} else {
-			result.SuccessCount++
+			continue
+		}
+
+		var video model.Video
+		err = database.GetCollection(s.collection).FindOne(ctx, bson.M{"_id": objectID}).Decode(&video)
+		if err != nil {
+			result.FailedCount++
+			result.FailedIDs = append(result.FailedIDs, id)
+			continue
+		}
+
+		// 权限检查
+		if video.UserID != req.UserID {
+			result.FailedCount++
+			result.FailedIDs = append(result.FailedIDs, id)
+			continue
+		}
+
+		// 执行操作
+		switch req.Action {
+		case "delete":
+			if err := s.Delete(ctx, id); err != nil {
+				result.FailedCount++
+				result.FailedIDs = append(result.FailedIDs, id)
+			} else {
+				result.SuccessCount++
+			}
+		case "update_status":
+			if !model.IsValidVideoStatus(req.Status) {
+				result.FailedCount++
+				result.FailedIDs = append(result.FailedIDs, id)
+				continue
+			}
+
+			update := bson.M{
+				"$set": bson.M{
+					"status":     req.Status,
+					"updated_at": time.Now(),
+				},
+			}
+
+			_, err := database.GetCollection(s.collection).UpdateOne(
+				ctx,
+				bson.M{"_id": objectID},
+				update,
+			)
+
+			if err != nil {
+				result.FailedCount++
+				result.FailedIDs = append(result.FailedIDs, id)
+			} else {
+				result.SuccessCount++
+			}
+		default:
+			return nil, errors.New("不支持的操作类型")
 		}
 	}
 
@@ -500,76 +548,85 @@ func (s *videoService) IncrementStats(ctx context.Context, id string, field stri
 type ListOptions struct {
 	Page     int
 	PageSize int
-	UserID   string    // 指定用户的视频
-	Status   []string  // 状态过滤
-	Sort     string    // 排序方式
-	Keyword  string    // 搜索关键词
+	UserID   string   // 指定用户的视频
+	Status   []string // 状态过滤
+	Sort     string   // 排序方式
+	Keyword  string   // 搜索关键词
 }
 
 // GetVideoList 获取视频列表
 func (s *videoService) GetVideoList(ctx context.Context, currentUserID string, opts ListOptions) ([]model.Video, int64, error) {
-	collection := database.GetCollection("videos")
-	
-	// 构建查询条件
+	// 1. 构建基础过滤条件
 	filter := bson.M{}
-	
-	// 1. 处理用户ID过滤
+
+	// 2. 处理用户ID过滤
 	if opts.UserID != "" {
-		// 查看指定用户的视频
 		filter["user_id"] = opts.UserID
-		
-		if currentUserID != opts.UserID {
-			// 如果不是查看自己的视频，只能看到公开视频
-			filter["status"] = "public"
+	}
+
+	// 3. 处理状态过滤和权限检查
+	if currentUserID != "" {
+		if opts.UserID == "" {
+			// 已登录用户查看所有视频
+			if len(opts.Status) > 0 {
+				// 指定了状态：返回所有公开视频和自己的指定状态视频
+				filter["$or"] = []bson.M{
+					{"status": model.VideoStatusPublic},
+					{"user_id": currentUserID, "status": bson.M{"$in": opts.Status}},
+				}
+			} else {
+				// 未指定状态：返回所有公开视频和自己的所有视频
+				filter["$or"] = []bson.M{
+					{"status": model.VideoStatusPublic},
+					{"user_id": currentUserID},
+				}
+			}
+		} else if currentUserID == opts.UserID {
+			// 查看自己的视频
+			if len(opts.Status) > 0 {
+				// 指定了状态：只返回指定状态的视频
+				filter["status"] = bson.M{"$in": opts.Status}
+			}
+			// 未指定状态：返回所有状态的视频（不需要额外过滤）
+		} else {
+			// 查看其他用户的视频：只能看到公开视频
+			filter["status"] = model.VideoStatusPublic
 		}
 	} else {
-		// 查看所有视频
-		if currentUserID != "" {
-			// 已登录用户：看到所有公开视频和自己的私有/草稿视频
-			filter["$or"] = []bson.M{
-				{"status": "public"},
-				{"$and": []bson.M{
-					{"user_id": currentUserID},
-					{"status": bson.M{"$in": []string{"private", "draft"}}},
-				}},
+		// 未登录用户只能看到公开视频
+		filter["status"] = model.VideoStatusPublic
+	}
+
+	// 4. 处理关键词搜索
+	if opts.Keyword != "" {
+		keywordFilter := bson.M{
+			"$or": []bson.M{
+				{"title": bson.M{"$regex": opts.Keyword, "$options": "i"}},
+				{"description": bson.M{"$regex": opts.Keyword, "$options": "i"}},
+			},
+		}
+
+		// 如果已经有 $or 条件，需要使用 $and 组合
+		if existingOr, hasOr := filter["$or"]; hasOr {
+			filter = bson.M{
+				"$and": []bson.M{
+					{"$or": existingOr.([]bson.M)},
+					keywordFilter,
+				},
 			}
 		} else {
-			// 未登录用户：只能看到公开视频
-			filter["status"] = "public"
+			filter["$or"] = keywordFilter["$or"]
 		}
 	}
-	
-	// 2. 处理状态过滤
-	if len(opts.Status) > 0 {
-		validStatus := make([]string, 0)
-		for _, status := range opts.Status {
-			// 对于 private 和 draft 状态，需要是视频作者
-			if status == "public" || 
-			   (currentUserID != "" && opts.UserID == currentUserID && 
-			   (status == "private" || status == "draft")) {
-				validStatus = append(validStatus, status)
-			}
-		}
-		if len(validStatus) > 0 {
-			filter["status"] = bson.M{"$in": validStatus}
-		}
-	}
-	
-	// 3. 处理关键词搜索
-	if opts.Keyword != "" {
-		filter["$or"] = []bson.M{
-			{"title": bson.M{"$regex": opts.Keyword, "$options": "i"}},
-			{"description": bson.M{"$regex": opts.Keyword, "$options": "i"}},
-		}
-	}
-	
-	// 4. 获取总数
+
+	// 5. 获取总数
+	collection := database.GetCollection(s.collection)
 	total, err := collection.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	
-	// 5. 处理排序
+
+	// 6. 处理排序
 	sortOpts := bson.D{}
 	if opts.Sort != "" {
 		if strings.HasPrefix(opts.Sort, "-") {
@@ -581,24 +638,24 @@ func (s *videoService) GetVideoList(ctx context.Context, currentUserID string, o
 		// 默认按创建时间倒序
 		sortOpts = append(sortOpts, bson.E{Key: "created_at", Value: -1})
 	}
-	
-	// 6. 查询数据
+
+	// 7. 查询数据
 	findOptions := options.Find().
 		SetSort(sortOpts).
 		SetSkip(int64((opts.Page - 1) * opts.PageSize)).
 		SetLimit(int64(opts.PageSize))
-	
+
 	cursor, err := collection.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer cursor.Close(ctx)
-	
+
 	var videos []model.Video
 	if err = cursor.All(ctx, &videos); err != nil {
 		return nil, 0, err
 	}
-	
+
 	return videos, total, nil
 }
 
