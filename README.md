@@ -4,35 +4,45 @@
 该项目是一个基于Go语言和Gin框架开发的视频管理平台后端服务，提供视频文件的基础管理功能，包括上传、获取和管理等功能。项目采用清晰的分层架构，遵循RESTful API设计规范，并实现了统一的错误处理和响应格式。
 
 ## 主要功能
+### 用户管理
+- ✅ 用户注册与登录
+  - ✅ 支持用户名、密码和邮箱注册
+  - ✅ 密码加密存储
+  - ✅ JWT令牌认证
+- ✅ 用户认证
+  - ✅ 基于JWT的身份验证
+  - ✅ 接口权限控制
+  - ✅ 用户会话管理
+
 ### 视频上传
-- 视频上传（支持断点续传）
-- 支持大文件上传（最大1GB）
-- 支持主流视频格式（mp4、mov、avi等）
-- 上传时可设置视频标题和描述信息
+- ✅ 视频上传（支持断点续传）
+- ✅ 支持大文件上传（最大1GB）
+- ✅ 支持主流视频格式（mp4、mov、avi等）
+- ✅ 上传时可设置视频标题和描述信息
 
 ### 视频获取
-- 视频流式播放
-- 视频列表查询（支持分页、排序、搜索）
-- 视频详情获取
+- ✅ 视频流式播放
+- ✅ 视频列表查询（支持分页、排序、搜索）
+- ✅ 视频详情获取
 
 ### 视频管理
-- 视频管理（列表、详情、修改、删除）
-- 支持批量删除
-- 支持修改视频基本信息
+- ✅ 视频管理（列表、详情、修改、删除）
+- ✅ 支持批量删除
+- ✅ 支持修改视频基本信息
 
 ### 用户标记、注释和笔记功能
-- 用户可以在视频播放过程中添加标记
-  - 支持添加、更新、删除标记
-  - 可以为标记添加时间戳和内容
-- 用户可以为每个标记添加文字注释
-  - 支持添加、更新、删除注释
-  - 注释与标记关联
-- 用户可以在视频播放过程中随时记录笔记
-  - 支持添加、更新、删除笔记
-  - 可以为笔记添加时间戳和内容
-- 支持导出所有标记、注释和笔记
-  - 导出为文本格式
-  - 包含时间戳和内容信息
+- ✅ 用户可以在视频播放过程中添加标记
+  - ✅ 支持添加、更新、删除标记
+  - ✅ 可以为标记添加时间戳和内容
+- ✅ 用户可以为每个标记添加文字注释
+  - ✅ 支持添加、更新、删除注释
+  - ✅ 注释与标记关联
+- ✅ 用户可以在视频播放过程中随时记录笔记
+  - ✅ 支持添加、更新、删除笔记
+  - ✅ 可以为笔记添加时间戳和内容
+- ✅ 支持导出所有标记、注释和笔记
+  - ✅ 导出为文本格式
+  - ✅ 包含时间戳和内容信息
 
 ## 技术栈
 - Go 1.20+
@@ -47,6 +57,35 @@
 - 合理的项目分层
 
 ## 开发日志
+
+### 2024-03-16 标记和笔记功能实现
+1. 标记功能实现
+   - 添加标记模型和服务
+   - 实现标记的增删改查API
+   - 支持按视频ID获取标记列表
+   - 添加标记权限验证
+
+2. 注释功能实现
+   - 添加注释模型
+   - 实现注释与标记的关联
+   - 支持注释的增删改查API
+   - 添加注释权限验证
+
+3. 笔记功能实现
+   - 添加笔记模型和服务
+   - 实现笔记的增删改查API
+   - 支持按视频ID获取笔记列表
+   - 添加笔记权限验证
+
+4. 导出功能
+   - 支持导出视频相关的所有标记、注释和笔记
+   - 支持多种导出格式
+   - 添加导出权限验证
+
+5. 用户认证完善
+   - 完善用户认证机制
+   - 添加路由权限控制
+   - 实现用户注册和登录API
 
 ### 2024-02-21 功能完善
 1. 视频时长功能
@@ -86,18 +125,27 @@
 │   ├── handler/    # HTTP处理器
 │   │   ├── middleware.go # 中间件
 │   │   ├── routes.go    # 路由定义
-│   │   └── video.go     # 视频处理器
+│   │   ├── user.go      # 用户处理器
+│   │   ├── video.go     # 视频处理器
+│   │   └── mark.go      # 标记处理器（包含标记、注释和笔记）
+│   ├── middleware/ # 中间件
+│   │   └── auth.go      # 认证中间件
 │   ├── model/     # 数据模型
-│   │   └── video.go     # 视频模型
+│   │   ├── user.go      # 用户模型
+│   │   ├── video.go     # 视频模型
+│   │   └── mark.go      # 标记模型（包含标记、注释和笔记）
 │   └── service/   # 业务逻辑
+│       ├── user.go      # 用户服务
 │       ├── video.go     # 视频服务
-│       └── video_test.go # 视频服务测试
+│       └── mark.go      # 标记服务（包含标记、注释和笔记）
 ├── pkg/           # 可重用的包
 │   ├── database/  # 数据库相关
 │   │   ├── mongodb.go   # MongoDB连接
 │   │   └── mongodb_test.go # MongoDB测试
 │   └── response/  # 响应处理
 │       └── response.go  # 统一响应格式
+├── scripts/       # 脚本文件
+│   └── clean_db.go      # 数据库清理工具
 └── test/          # 测试文件
 ```
 
@@ -328,6 +376,366 @@
 - Accept-Ranges: bytes
 - 支持断点续传
 - 直接返回视频流
+
+### 用户管理接口
+
+#### 1. 用户注册
+- 请求方法: `POST`
+- 路径: `/api/v1/users/register`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "username": "user123",
+    "password": "password123",
+    "email": "user@example.com"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "id": "用户ID",
+        "username": "user123",
+        "email": "user@example.com",
+        "status": 1,
+        "createdAt": "2024-03-16T12:00:00Z",
+        "updatedAt": "2024-03-16T12:00:00Z"
+    }
+}
+```
+
+#### 2. 用户登录
+- 请求方法: `POST`
+- 路径: `/api/v1/users/login`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "username": "user123",
+    "password": "password123"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "user": {
+            "id": "用户ID",
+            "username": "user123",
+            "email": "user@example.com",
+            "status": 1,
+            "createdAt": "2024-03-16T12:00:00Z",
+            "updatedAt": "2024-03-16T12:00:00Z"
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+}
+```
+
+### 标记、注释和笔记管理接口
+
+#### 10. 添加标记
+- 请求方法: `POST`
+- 路径: `/api/v1/marks`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "videoId": "视频ID",
+    "timestamp": 125.5,
+    "content": "这是一个标记"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "id": "标记ID",
+        "userId": "用户ID",
+        "videoId": "视频ID",
+        "timestamp": 125.5,
+        "content": "这是一个标记",
+        "annotations": [],
+        "createdAt": "2024-03-16T10:00:00Z",
+        "updatedAt": "2024-03-16T10:00:00Z"
+    }
+}
+```
+
+#### 11. 获取标记列表
+- 请求方法: `GET`
+- 路径: `/api/v1/marks`
+- 参数:
+  - `videoId`: 视频ID（必填）
+  - `page`: 页码（默认1）
+  - `pageSize`: 每页数量（默认10，最大50）
+  - `sortBy`: 排序字段（timestamp/created_at）
+  - `sortOrder`: 排序方向（asc/desc）
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "total": 5,
+        "items": [
+            {
+                "id": "标记ID",
+                "userId": "用户ID",
+                "videoId": "视频ID",
+                "timestamp": 125.5,
+                "content": "这是一个标记",
+                "annotations": [
+                    {
+                        "id": "注释ID",
+                        "userId": "用户ID",
+                        "markId": "标记ID",
+                        "content": "这是一个注释",
+                        "createdAt": "2024-03-16T10:30:00Z",
+                        "updatedAt": "2024-03-16T10:30:00Z"
+                    }
+                ],
+                "createdAt": "2024-03-16T10:00:00Z",
+                "updatedAt": "2024-03-16T10:00:00Z"
+            }
+        ]
+    }
+}
+```
+
+#### 12. 更新标记
+- 请求方法: `PUT`
+- 路径: `/api/v1/marks/:markId`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "timestamp": 130.0,
+    "content": "更新后的标记内容"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": null
+}
+```
+
+#### 13. 删除标记
+- 请求方法: `DELETE`
+- 路径: `/api/v1/marks/:markId`
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": null
+}
+```
+
+#### 14. 添加注释
+- 请求方法: `POST`
+- 路径: `/api/v1/marks/:markId/annotations`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "content": "这是一个注释"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "id": "注释ID",
+        "userId": "用户ID",
+        "markId": "标记ID",
+        "content": "这是一个注释",
+        "createdAt": "2024-03-16T10:30:00Z",
+        "updatedAt": "2024-03-16T10:30:00Z"
+    }
+}
+```
+
+#### 15. 获取注释列表
+- 请求方法: `GET`
+- 路径: `/api/v1/marks/:markId/annotations`
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": [
+        {
+            "id": "注释ID",
+            "userId": "用户ID",
+            "markId": "标记ID",
+            "content": "这是一个注释",
+            "createdAt": "2024-03-16T10:30:00Z",
+            "updatedAt": "2024-03-16T10:30:00Z"
+        }
+    ]
+}
+```
+
+#### 16. 更新注释
+- 请求方法: `PUT`
+- 路径: `/api/v1/marks/annotations/:annotationId`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "content": "更新后的注释内容"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": null
+}
+```
+
+#### 17. 删除注释
+- 请求方法: `DELETE`
+- 路径: `/api/v1/marks/annotations/:annotationId`
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": null
+}
+```
+
+#### 18. 添加笔记
+- 请求方法: `POST`
+- 路径: `/api/v1/notes`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "videoId": "视频ID",
+    "timestamp": 200.5,
+    "content": "这是一个笔记"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "id": "笔记ID",
+        "userId": "用户ID",
+        "videoId": "视频ID",
+        "timestamp": 200.5,
+        "content": "这是一个笔记",
+        "createdAt": "2024-03-16T11:00:00Z",
+        "updatedAt": "2024-03-16T11:00:00Z"
+    }
+}
+```
+
+#### 19. 获取笔记列表
+- 请求方法: `GET`
+- 路径: `/api/v1/notes`
+- 参数:
+  - `videoId`: 视频ID（必填）
+  - `page`: 页码（默认1）
+  - `pageSize`: 每页数量（默认10，最大50）
+  - `sortBy`: 排序字段（timestamp/created_at）
+  - `sortOrder`: 排序方向（asc/desc）
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "total": 3,
+        "items": [
+            {
+                "id": "笔记ID",
+                "userId": "用户ID",
+                "videoId": "视频ID",
+                "timestamp": 200.5,
+                "content": "这是一个笔记",
+                "createdAt": "2024-03-16T11:00:00Z",
+                "updatedAt": "2024-03-16T11:00:00Z"
+            }
+        ]
+    }
+}
+```
+
+#### 20. 更新笔记
+- 请求方法: `PUT`
+- 路径: `/api/v1/notes/:noteId`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "timestamp": 210.0,
+    "content": "更新后的笔记内容"
+}
+```
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": null
+}
+```
+
+#### 21. 删除笔记
+- 请求方法: `DELETE`
+- 路径: `/api/v1/notes/:noteId`
+
+#### 响应
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": null
+}
+```
+
+#### 22. 导出标记、注释和笔记
+- 请求方法: `GET`
+- 路径: `/api/v1/videos/export`
+- 参数:
+  - `videoId`: 视频ID（必填）
+  - `format`: 导出格式（可选，默认txt，支持txt/md/json）
+
+#### 响应
+- Content-Type: 根据format参数变化（text/plain, text/markdown, application/json）
+- Content-Disposition: attachment; filename=export_文件名.扩展名
 
 ## 错误码说明
 - 400: 请求参数错误
