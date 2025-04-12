@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 	"video-platform/internal/model"
 	"video-platform/pkg/database"
 
@@ -44,6 +45,8 @@ func (s *markServiceImpl) AddMark(ctx context.Context, userID string, mark *mode
 	mark.ID = primitive.NewObjectID()
 	mark.UserID = userID // 设置用户ID
 	collection := database.GetCollection(s.collection)
+	mark.CreatedAt = time.Now()
+	mark.UpdatedAt = time.Now()
 	_, err := collection.InsertOne(ctx, mark)
 	return err
 }
@@ -78,6 +81,8 @@ func (s *markServiceImpl) GetMarks(ctx context.Context, userID string, videoID s
 func (s *markServiceImpl) AddAnnotation(ctx context.Context, annotation *model.Annotation) error {
 	annotation.ID = primitive.NewObjectID()
 	collection := database.GetCollection("annotations")
+	annotation.CreatedAt = time.Now()
+	annotation.UpdatedAt = time.Now()
 	_, err := collection.InsertOne(ctx, annotation)
 	return err
 }
@@ -100,6 +105,8 @@ func (s *markServiceImpl) GetAnnotations(ctx context.Context, markID primitive.O
 func (s *markServiceImpl) AddNote(ctx context.Context, note *model.Note) error {
 	note.ID = primitive.NewObjectID()
 	collection := database.GetCollection("notes")
+	note.CreatedAt = time.Now()
+	note.UpdatedAt = time.Now()
 	_, err := collection.InsertOne(ctx, note)
 	return err
 }
@@ -121,6 +128,7 @@ func (s *markServiceImpl) GetNotes(ctx context.Context, videoID string) ([]model
 // UpdateMark 更新标记
 func (s *markServiceImpl) UpdateMark(ctx context.Context, userID string, markID primitive.ObjectID, mark *model.Mark) error {
 	collection := database.GetCollection(s.collection)
+	mark.UpdatedAt = time.Now()
 	_, err := collection.UpdateOne(ctx, gin.H{"_id": markID, "user_id": userID}, gin.H{"$set": mark})
 	return err
 }
@@ -135,6 +143,7 @@ func (s *markServiceImpl) DeleteMark(ctx context.Context, userID string, markID 
 // UpdateAnnotation 更新注释
 func (s *markServiceImpl) UpdateAnnotation(ctx context.Context, userID string, annotationID primitive.ObjectID, annotation *model.Annotation) error {
 	collection := database.GetCollection("annotations")
+	annotation.UpdatedAt = time.Now()
 	_, err := collection.UpdateOne(ctx, gin.H{"_id": annotationID, "user_id": userID}, gin.H{"$set": annotation})
 	return err
 }
@@ -149,6 +158,7 @@ func (s *markServiceImpl) DeleteAnnotation(ctx context.Context, userID string, a
 // UpdateNote 更新笔记
 func (s *markServiceImpl) UpdateNote(ctx context.Context, userID string, noteID primitive.ObjectID, note *model.Note) error {
 	collection := database.GetCollection("notes")
+	note.UpdatedAt = time.Now()
 	_, err := collection.UpdateOne(ctx, gin.H{"_id": noteID, "user_id": userID}, gin.H{"$set": note})
 	return err
 }
