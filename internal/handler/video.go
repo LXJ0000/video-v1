@@ -367,7 +367,7 @@ func (h *VideoHandler) GetVideoList(c *gin.Context) {
 	opts := service.ListOptions{
 		Page:     page,
 		PageSize: pageSize,
-		UserID:   c.Query("userId"),  // 可选：指定用户的视频
+		UserID:   userIDStr,  // 可选：指定用户的视频
 		Keyword:  c.Query("keyword"), // 可选：搜索关键词
 		Sort:     c.Query("sortBy"),  // 修正排序字段名
 	}
