@@ -17,6 +17,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -103,14 +104,25 @@ func (s *userService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 	return &user, token, nil
 }
 
-// GetUserByID 根据ID获取用户信息
+// 修改GetByID方法
 func (s *userService) GetByID(ctx context.Context, id string) (*model.User, error) {
 	collection := database.GetCollection(s.collection)
 	var user model.User
-	err := collection.FindOne(ctx, bson.M{"_id": id}).Decode(&user)
+
+	// 将字符串ID转换为ObjectID
+	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
+		return nil, fmt.Errorf("无效的ID格式: %w", err)
+	}
+
+	err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("未找到ID为%s的用户", id)
+		}
 		return nil, err
 	}
+
 	return &user, nil
 }
 
