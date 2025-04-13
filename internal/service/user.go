@@ -150,6 +150,7 @@ func (s *userService) GetUserProfile(ctx context.Context, id string) (*model.Use
 	if err != nil {
 		// 如果没有资料，创建默认资料
 		profile = &model.UserProfile{
+			Nickname:    "", // 默认昵称
 			Avatar:      "", // 默认头像
 			Description: "", // 默认简介
 			UpdatedAt:   time.Now(),
@@ -159,6 +160,7 @@ func (s *userService) GetUserProfile(ctx context.Context, id string) (*model.Use
 	return &model.UserProfileResponse{
 		ID:        user.ID.Hex(),
 		Username:  user.Username,
+		Nickname:  profile.Nickname,
 		Email:     user.Email,
 		Avatar:    profile.Avatar,
 		Bio:       profile.Description,
@@ -301,11 +303,13 @@ func (s *userService) UpdateUserProfile(ctx context.Context, id string, req *mod
 
 	// 获取或创建用户资料
 	var profile model.UserProfile
-	err = database.GetCollection("user_profiles").FindOne(ctx, bson.M{"_id": id}).Decode(&profile)
+	profileCollection := database.GetCollection("user_profiles")
+	err = profileCollection.FindOne(ctx, bson.M{"_id": id}).Decode(&profile)
 	if err != nil {
 		// 如果用户资料不存在，创建一个新的
 		profile = model.UserProfile{
-			Avatar:      "", // 会在下面更新
+			Nickname:    "", // 默认昵称
+			Avatar:      "", // 默认头像
 			Description: "",
 			UpdatedAt:   time.Now(),
 		}
@@ -316,6 +320,10 @@ func (s *userService) UpdateUserProfile(ctx context.Context, id string, req *mod
 
 	if req.Bio != "" {
 		profileUpdateFields["description"] = req.Bio
+	}
+
+	if req.Nickname != "" {
+		profileUpdateFields["nickname"] = req.Nickname
 	}
 
 	// 处理头像上传

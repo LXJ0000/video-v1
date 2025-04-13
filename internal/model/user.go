@@ -42,6 +42,7 @@ type UserProfile struct {
 type UserProfileResponse struct {
 	ID        string    `json:"id"`
 	Username  string    `json:"username"`
+	Nickname  string    `json:"nickname"`
 	Email     string    `json:"email"`
 	Avatar    string    `json:"avatar"`
 	Bio       string    `json:"bio"`
@@ -58,9 +59,10 @@ type UserStats struct {
 
 // UpdateProfileRequest 更新用户资料请求
 type UpdateProfileRequest struct {
-	Username string `json:"username" binding:"omitempty,min=3,max=32"`
+	Username string `json:"username" binding:"omitempty,min=1,max=32"`
 	Email    string `json:"email" binding:"omitempty,email"`
 	Bio      string `json:"bio" binding:"omitempty,max=200"`
+	Nickname string `json:"nickname" binding:"omitempty,min=1,max=32"`
 	// Avatar通过multipart/form-data上传，不在JSON中
 }
 
