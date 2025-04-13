@@ -36,15 +36,21 @@ func InitRoutes(r *gin.Engine) {
 		{
 			users.POST("/register", userHandler.Register) // 用户注册
 			users.POST("/login", userHandler.Login)       // 用户登录
+			users.GET("/:userId/profile", userHandler.GetUserProfile)
+			users.PUT("/:userId/profile", middleware.Auth(), userHandler.UpdateUserProfile)
+			users.GET("/:userId/watch-history", middleware.Auth(), userHandler.GetWatchHistory)
+			users.GET("/:userId/favorites", middleware.Auth(), userHandler.GetFavorites)
 		}
 
 		// 公开接口（无需认证）
 		videos := v1.Group("/videos")
 		{
-			videos.GET("/public", videoHandler.GetPublicVideoList) // 获取公开视频列表
-			videos.GET("/:id/stream", videoHandler.Stream)         // 视频流式播放
-			videos.GET("/:id", videoHandler.GetByID)               // 获取视频详情
-
+			videos.GET("/public", videoHandler.GetPublicVideoList)                                  // 获取公开视频列表
+			videos.GET("/:videoId/stream", videoHandler.Stream)                                     // 视频流式播放
+			videos.GET("/:videoId", videoHandler.GetByID)                                           // 获取视频详情
+			videos.POST("/:videoId/favorite", middleware.Auth(), userHandler.AddToFavorites)        // 添加收藏
+			videos.DELETE("/:videoId/favorite", middleware.Auth(), userHandler.RemoveFromFavorites) // 取消收藏
+			videos.POST("/:videoId/watch", middleware.Auth(), userHandler.RecordWatchHistory)       // 记录观看历史
 		}
 
 		// 需要认证的路由
@@ -56,13 +62,13 @@ func InitRoutes(r *gin.Engine) {
 			{
 				authVideos.GET("", videoHandler.GetVideoList) // 获取视频列表
 				authVideos.POST("", videoHandler.Upload)      // 上传视频
-				// authVideos.GET("/:id", videoHandler.GetByID)   // 获取视频详情
-				authVideos.PUT("/:id", videoHandler.Update)    // 更新视频信息
-				authVideos.DELETE("/:id", videoHandler.Delete) // 删除视频
-				// authVideos.GET("/:id/stream", videoHandler.Stream)              // 视频流式播放
-				authVideos.POST("/batch", videoHandler.BatchOperation)          // 批量操作
-				authVideos.POST("/:id/thumbnail", videoHandler.UpdateThumbnail) // 更新缩略图
-				authVideos.GET("/:id/stats", videoHandler.GetStats)             // 获取统计信息
+				// authVideos.GET("/:videoId", videoHandler.GetByID)   // 获取视频详情
+				authVideos.PUT("/:videoId", videoHandler.Update)    // 更新视频信息
+				authVideos.DELETE("/:videoId", videoHandler.Delete) // 删除视频
+				// authVideos.GET("/:videoId/stream", videoHandler.Stream)              // 视频流式播放
+				authVideos.POST("/batch", videoHandler.BatchOperation)               // 批量操作
+				authVideos.POST("/:videoId/thumbnail", videoHandler.UpdateThumbnail) // 更新缩略图
+				authVideos.GET("/:videoId/stats", videoHandler.GetStats)             // 获取统计信息
 			}
 
 			// 标记相关路由

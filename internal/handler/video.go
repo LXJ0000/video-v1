@@ -83,8 +83,8 @@ func (h *VideoHandler) Upload(c *gin.Context) {
 
 // GetByID 获取视频详情
 func (h *VideoHandler) GetByID(c *gin.Context) {
-	id := c.Param("id")
-	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	videoId := c.Param("videoId")
+	video, err := h.videoService.GetByID(c.Request.Context(), videoId)
 	if err != nil {
 		response.Fail(c, http.StatusNotFound, "视频不存在")
 		return
@@ -102,10 +102,10 @@ func (h *VideoHandler) Update(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	videoId := c.Param("videoId")
 
 	// 检查视频是否存在且属于当前用户
-	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	video, err := h.videoService.GetByID(c.Request.Context(), videoId)
 	if err != nil {
 		response.Fail(c, http.StatusNotFound, "视频不存在")
 		return
@@ -126,7 +126,7 @@ func (h *VideoHandler) Update(c *gin.Context) {
 	// 设置用户ID，确保不会被修改
 	updateData.UserID = userID.(string)
 
-	if err := h.videoService.Update(c.Request.Context(), id, updateData); err != nil {
+	if err := h.videoService.Update(c.Request.Context(), videoId, updateData); err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -143,10 +143,10 @@ func (h *VideoHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	videoId := c.Param("videoId")
 
 	// 检查视频是否存在且属于当前用户
-	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	video, err := h.videoService.GetByID(c.Request.Context(), videoId)
 	if err != nil {
 		response.Fail(c, http.StatusNotFound, "视频不存在")
 		return
@@ -158,7 +158,7 @@ func (h *VideoHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.videoService.Delete(c.Request.Context(), id); err != nil {
+	if err := h.videoService.Delete(c.Request.Context(), videoId); err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -168,8 +168,8 @@ func (h *VideoHandler) Delete(c *gin.Context) {
 
 // Stream 视频流式播放
 func (h *VideoHandler) Stream(c *gin.Context) {
-	id := c.Param("id")
-	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	videoId := c.Param("videoId")
+	video, err := h.videoService.GetByID(c.Request.Context(), videoId)
 	if err != nil {
 		response.Fail(c, http.StatusNotFound, "视频不存在")
 		return
@@ -186,7 +186,7 @@ func (h *VideoHandler) Stream(c *gin.Context) {
 	// }
 
 	// 增加观看次数
-	go h.videoService.IncrementStats(context.Background(), id, "views")
+	go h.videoService.IncrementStats(context.Background(), videoId, "views")
 
 	filePath := filepath.Join(config.GlobalConfig.Storage.UploadDir, video.FileName)
 	file, err := os.Open(filePath)
@@ -308,10 +308,10 @@ func (h *VideoHandler) UpdateThumbnail(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	videoId := c.Param("videoId")
 
 	// 检查视频是否存在且属于当前用户
-	video, err := h.videoService.GetByID(c.Request.Context(), id)
+	video, err := h.videoService.GetByID(c.Request.Context(), videoId)
 	if err != nil {
 		response.Fail(c, http.StatusNotFound, "视频不存在")
 		return
@@ -329,7 +329,7 @@ func (h *VideoHandler) UpdateThumbnail(c *gin.Context) {
 		return
 	}
 
-	thumbnailURL, err := h.videoService.UpdateThumbnail(c.Request.Context(), id, file)
+	thumbnailURL, err := h.videoService.UpdateThumbnail(c.Request.Context(), videoId, file)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
@@ -340,8 +340,8 @@ func (h *VideoHandler) UpdateThumbnail(c *gin.Context) {
 
 // GetStats 获取视频统计信息
 func (h *VideoHandler) GetStats(c *gin.Context) {
-	id := c.Param("id")
-	stats, err := h.videoService.GetStats(c.Request.Context(), id)
+	videoId := c.Param("videoId")
+	stats, err := h.videoService.GetStats(c.Request.Context(), videoId)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
@@ -367,7 +367,7 @@ func (h *VideoHandler) GetVideoList(c *gin.Context) {
 	opts := service.ListOptions{
 		Page:     page,
 		PageSize: pageSize,
-		UserID:   userIDStr,  // 可选：指定用户的视频
+		UserID:   userIDStr,          // 可选：指定用户的视频
 		Keyword:  c.Query("keyword"), // 可选：搜索关键词
 		Sort:     c.Query("sortBy"),  // 修正排序字段名
 	}
