@@ -77,6 +77,174 @@ go build -o video-platform cmd/main.go
    - 运行指定包测试：`go test ./internal/service`
    - 生成测试覆盖率报告：`go test -cover ./...`
 
+## 测试架构与指南
+
+### 测试架构概述
+
+本项目采用分层测试策略，主要包括以下几个层次的测试：
+
+1. **单元测试** - 测试独立的函数和方法
+2. **集成测试** - 测试多个组件之间的交互
+3. **处理器测试** - 测试HTTP请求处理逻辑
+4. **端到端测试** - 测试整个API流程
+
+### 测试文档
+
+项目提供了详细的测试文档，帮助开发人员编写和维护测试：
+
+- [测试指南](docs/testing.md) - 详细说明测试架构、编写方法和最佳实践
+- [测试问题排查](docs/test-troubleshooting.md) - 常见测试问题和解决方案
+
+### 单元测试框架
+
+- 使用Go标准的`testing`包作为基础测试框架
+- 使用`github.com/stretchr/testify/assert`简化断言
+- 使用`github.com/stretchr/testify/mock`进行模拟
+
+### 服务层测试
+
+服务层测试主要测试业务逻辑，模拟数据库操作。以`service/user_test.go`为例：
+
+```go
+// 示例：测试用户登录功能
+func TestUserLoginSuccess(t *testing.T) {
+    // 准备测试数据
+    userID := primitive.NewObjectID()
+    user := &model.User{
+        ID:        userID,
+        Username:  "testuser",
+        Password:  hashedPassword,
+        Email:     "test@example.com",
+        Status:    1,
+    }
+    
+    // 验证预期结果
+    assert.Equal(t, user.Username, "testuser")
+    assert.Equal(t, user.Email, "test@example.com")
+}
+```
+
+#### 模拟数据库
+
+服务层测试中，使用`MockCollection`模拟MongoDB集合：
+
+```go
+// 模拟Collection接口
+type MockCollection struct {
+    mock.Mock
+    *mongo.Collection
+}
+
+func (m *MockCollection) FindOne(ctx context.Context, filter interface{}) *mongo.SingleResult {
+    args := m.Called(ctx, filter)
+    return args.Get(0).(*mongo.SingleResult)
+}
+
+// ... 其他数据库方法模拟 ...
+```
+
+### 处理器层测试
+
+处理器测试使用Gin的测试工具和模拟服务层。以`handler/user_test.go`为例：
+
+```go
+// 测试获取用户详情
+func TestGetUserProfile(t *testing.T) {
+    c, w, mockService, handler := setupUserTest()
+
+    // 模拟当前登录用户
+    userId := primitive.NewObjectID().Hex()
+    c.Set("userId", userId)
+    c.Params = []gin.Param{{Key: "userId", Value: "me"}}
+    c.Request = httptest.NewRequest("GET", "/", nil)  // 确保请求对象不为nil
+
+    // ... 模拟服务响应与执行测试 ...
+
+    // 验证响应
+    assert.Equal(t, http.StatusOK, w.Code)
+}
+```
+
+#### 模拟服务层
+
+处理器测试中，使用`MockUserService`模拟服务层接口：
+
+```go
+// 创建UserService的Mock
+type MockUserService struct {
+    mock.Mock
+}
+
+func (m *MockUserService) GetUserProfile(ctx context.Context, id string) (*model.UserProfileResponse, error) {
+    args := m.Called(ctx, id)
+    return args.Get(0).(*model.UserProfileResponse), args.Error(1)
+}
+
+// ... 其他服务方法模拟 ...
+```
+
+### 测试的注意事项
+
+1. **请求对象初始化**
+   - 在Gin测试上下文中，确保`c.Request`不为nil
+   - 使用`httptest.NewRequest`创建请求对象
+   - 示例：`c.Request = httptest.NewRequest("GET", "/", nil)`
+
+2. **模拟数据清理**
+   - 测试后清理模拟的数据和连接
+   - 使用`defer`确保资源释放
+   - 示例：`defer cursor.Close(ctx)`
+
+3. **避免测试间依赖**
+   - 每个测试应该独立运行
+   - 不要依赖测试的执行顺序
+   - 使用`t.Parallel()`支持并行测试
+
+4. **边界条件测试**
+   - 测试空值、错误输入和边界情况
+   - 验证错误处理逻辑
+   - 测试权限验证失败情况
+
+### 运行测试指南
+
+1. **运行所有测试**
+   ```bash
+   go test ./...
+   ```
+
+2. **运行特定包的测试**
+   ```bash
+   go test ./internal/service
+   go test ./internal/handler
+   ```
+
+3. **运行单个测试函数**
+   ```bash
+   go test ./internal/handler -run TestGetUserProfile
+   ```
+
+4. **带详细输出的测试**
+   ```bash
+   go test -v ./internal/handler
+   ```
+
+5. **强制不使用缓存的测试**
+   ```bash
+   go test -count=1 ./...
+   ```
+
+6. **生成测试覆盖率报告**
+   ```bash
+   go test -cover ./...
+   go test -coverprofile=coverage.out ./...
+   go tool cover -html=coverage.out
+   ```
+
+7. **测试超时设置**
+   ```bash
+   go test -timeout 30s ./...
+   ```
+
 ## 主要功能
 ### 用户管理
 - ✅ 用户注册与登录
