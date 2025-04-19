@@ -47,7 +47,7 @@ func InitRoutes(r *gin.Engine) {
 		{
 			videos.GET("/public", videoHandler.GetPublicVideoList)                                  // 获取公开视频列表
 			videos.GET("/:videoId/stream", videoHandler.Stream)                                     // 视频流式播放
-			videos.GET("/:videoId", videoHandler.GetByID)                                           // 获取视频详情
+			videos.GET("/:videoId", middleware.SetUserId(), videoHandler.GetByID)                   // 获取视频详情
 			videos.POST("/:videoId/favorite", middleware.Auth(), userHandler.AddToFavorites)        // 添加收藏
 			videos.DELETE("/:videoId/favorite", middleware.Auth(), userHandler.RemoveFromFavorites) // 取消收藏
 			videos.POST("/:videoId/watch", middleware.Auth(), userHandler.RecordWatchHistory)       // 记录观看历史

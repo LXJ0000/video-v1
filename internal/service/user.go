@@ -524,8 +524,11 @@ func (s *userService) AddToFavorites(ctx context.Context, userID, videoID string
 	videoCollection := database.GetCollection("videos")
 
 	var video model.Video
-	err := videoCollection.FindOne(ctx, bson.M{"_id": videoID}).Decode(&video)
+	objectID, err := primitive.ObjectIDFromHex(videoID)
 	if err != nil {
+		return fmt.Errorf("无效的ID格式: %w", err)
+	}
+	if err := videoCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&video); err != nil {
 		return errors.New("视频不存在")
 	}
 
@@ -654,7 +657,7 @@ func (s *userService) CheckFavoriteStatus(ctx context.Context, userID, videoID s
 	if userID == "" || videoID == "" {
 		return false, nil
 	}
-	
+
 	collection := database.GetCollection("favorites")
 	count, err := collection.CountDocuments(ctx, bson.M{
 		"user_id":  userID,
