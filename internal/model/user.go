@@ -63,7 +63,7 @@ type UpdateProfileRequest struct {
 	Email    string `json:"email" binding:"omitempty,email"`
 	Bio      string `json:"bio" binding:"omitempty,max=200"`
 	Nickname string `json:"nickname" binding:"omitempty,min=1,max=32"`
-	// Avatar通过multipart/form-data上传，不在JSON中
+	Avatar   string `json:"avatar" binding:"omitempty"` // Base64编码的图片数据
 }
 
 // WatchHistory 观看历史记录

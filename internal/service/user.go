@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -326,9 +327,58 @@ func (s *userService) UpdateUserProfile(ctx context.Context, id string, req *mod
 		profileUpdateFields["nickname"] = req.Nickname
 	}
 
-	// 处理头像上传
+	// 处理头像 - 支持Base64格式
 	var avatarURL string
-	if avatar != nil {
+	if req.Avatar != "" && strings.HasPrefix(req.Avatar, "data:image/") {
+		// 从Base64数据中提取图片格式和数据
+		dataURI := req.Avatar
+		commaIndex := strings.Index(dataURI, ",")
+		if commaIndex != -1 {
+			// 解析MIME类型
+			mimeType := ""
+			if strings.HasPrefix(dataURI, "data:") && strings.Contains(dataURI[:commaIndex], ";base64") {
+				mimeType = strings.TrimPrefix(dataURI[:strings.Index(dataURI, ";")], "data:")
+			}
+
+			// 根据MIME类型确定文件扩展名
+			var ext string
+			switch mimeType {
+			case "image/jpeg", "image/jpg":
+				ext = ".jpg"
+			case "image/png":
+				ext = ".png"
+			case "image/gif":
+				ext = ".gif"
+			default:
+				return nil, errors.New("不支持的图片格式，只支持jpg、jpeg、png、gif")
+			}
+
+			// 解码Base64数据
+			base64Data := dataURI[commaIndex+1:]
+			imgData, err := base64.StdEncoding.DecodeString(base64Data)
+			if err != nil {
+				return nil, errors.New("解码头像图片失败: " + err.Error())
+			}
+
+			// 验证文件大小
+			if len(imgData) > 2*1024*1024 { // 2MB
+				return nil, errors.New("头像大小不能超过2MB")
+			}
+
+			// 生成唯一文件名
+			avatarFileName := fmt.Sprintf("avatar_%s%s", id, ext)
+			avatarPath := filepath.Join(config.GlobalConfig.Storage.UploadDir, avatarFileName)
+
+			// 保存文件
+			err = os.WriteFile(avatarPath, imgData, 0644)
+			if err != nil {
+				return nil, errors.New("保存头像失败: " + err.Error())
+			}
+
+			avatarURL = fmt.Sprintf("/uploads/%s", avatarFileName)
+			profileUpdateFields["avatar"] = avatarURL
+		}
+	} else if avatar != nil { // 保留对multipart.FileHeader的处理以兼容旧代码
 		// 验证文件大小
 		if avatar.Size > 2*1024*1024 { // 2MB
 			return nil, errors.New("头像大小不能超过2MB")

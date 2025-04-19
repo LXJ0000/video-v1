@@ -7,7 +7,6 @@ import (
 	"video-platform/internal/service"
 	"video-platform/pkg/response"
 
-	"mime/multipart"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -118,7 +117,7 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 		}
 	}
 
-	// 处理表单数据
+	// 处理JSON数据
 	var req model.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, "无效的请求参数")
@@ -126,15 +125,8 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 		return
 	}
 
-	// 处理头像文件
-	var avatar *multipart.FileHeader
-	file, err := c.FormFile("avatar")
-	if err == nil {
-		avatar = file
-	}
-
-	// 更新用户资料
-	profile, err := h.userService.UpdateUserProfile(c.Request.Context(), userID, &req, avatar)
+	// 更新用户资料 - 不再单独处理FormFile，直接传递req（包含Base64格式的avatar）
+	profile, err := h.userService.UpdateUserProfile(c.Request.Context(), userID, &req, nil)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		slog.Error("[UpdateUserProfile] 更新用户资料失败", "error", err)
