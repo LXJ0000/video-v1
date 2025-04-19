@@ -50,7 +50,7 @@ func NewVideoService() VideoService {
 func (s *videoService) Upload(ctx context.Context, videoFile *multipart.FileHeader, coverFile *multipart.FileHeader, info model.Video) (*model.Video, error) {
 	// 验证视频文件格式
 	videoExt := filepath.Ext(videoFile.Filename)
-	if !isValidVideoFormat(videoExt) {
+	if !isValidVideoFormat(strings.ToLower(videoExt)) {
 		return nil, errors.New("不支持的视频格式")
 	}
 

@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"time"
-	"video-platform/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,9 +12,6 @@ func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 从配置读取允许的源，如果没有配置则允许所有源
 		allowOrigin := "*"
-		if config.GlobalConfig.Server.AllowOrigins != "" {
-			allowOrigin = config.GlobalConfig.Server.AllowOrigins
-		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")

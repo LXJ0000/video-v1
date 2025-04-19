@@ -2,11 +2,13 @@ package aliyun
 
 import (
 	"context"
-	sms2 "github.com/LXJ0000/go-backend/internal/usecase/sms"
-	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	sms "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
 	"os"
 	"testing"
+
+	sms2 "video-platform/pkg/sms"
+
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
+	sms "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
 )
 
 func TestService_Send(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	sms2 "github.com/LXJ0000/go-backend/internal/usecase/sms"
+	sms2 "video-platform/pkg/sms"
 	sms "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
 )
 
