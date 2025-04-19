@@ -556,22 +556,22 @@ func (m *MockUserService) GetUserProfile(ctx context.Context, id string) (*model
     "msg": "success",
     "data": {
         "video": {
-            "id": "视频ID",
-            "title": "视频标题",
-            "description": "视频描述",
-            "fileSize": 1024,
-            "format": "mp4",
-            "status": "public",
-            "tags": ["标签1", "标签2"],
-            "thumbnailUrl": "缩略图URL",
-            "stats": {
-                "views": 100,
-                "likes": 50,
-                "comments": 20,
-                "shares": 10
-            },
-            "createdAt": "2024-01-20T10:00:00Z",
-            "updatedAt": "2024-01-20T10:00:00Z"
+        "id": "视频ID",
+        "title": "视频标题",
+        "description": "视频描述",
+        "fileSize": 1024,
+        "format": "mp4",
+        "status": "public",
+        "tags": ["标签1", "标签2"],
+        "thumbnailUrl": "缩略图URL",
+        "stats": {
+            "views": 100,
+            "likes": 50,
+            "comments": 20,
+            "shares": 10
+        },
+        "createdAt": "2024-01-20T10:00:00Z",
+        "updatedAt": "2024-01-20T10:00:00Z"
         },
         "isFavorite": true  // 当用户已登录时，返回用户是否已收藏此视频
     }

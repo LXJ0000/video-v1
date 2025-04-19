@@ -16,6 +16,32 @@ var (
 	database string
 )
 
+// 以下变量和函数用于测试目的
+var (
+	GetCollection = getCollection // 导出获取集合的函数
+	GetClient     = getClient     // 导出获取客户端的函数
+)
+
+// SetTestHooks 设置测试时使用的替代函数，并返回用于恢复原始函数的回调
+func SetTestHooks(
+	collectionFn func(string) *mongo.Collection,
+	clientFn func() *mongo.Client,
+) func() {
+	// 保存原始函数
+	origGetCollection := GetCollection
+	origGetClient := GetClient
+
+	// 替换为测试用函数
+	GetCollection = collectionFn
+	GetClient = clientFn
+
+	// 返回用于恢复原始函数的回调
+	return func() {
+		GetCollection = origGetCollection
+		GetClient = origGetClient
+	}
+}
+
 // InitMongoDB 初始化MongoDB连接
 func InitMongoDB(ctx context.Context, cfg config.MongoDBConfig, isTest bool) error {
 	clientOptions := options.Client().ApplyURI(cfg.URI)
@@ -35,13 +61,13 @@ func InitMongoDB(ctx context.Context, cfg config.MongoDBConfig, isTest bool) err
 	return client.Ping(ctx, nil)
 }
 
-// GetCollection 获取集合
-func GetCollection(name string) *mongo.Collection {
+// getCollection 获取集合的内部实现
+func getCollection(name string) *mongo.Collection {
 	return client.Database(database).Collection(name)
 }
 
-// GetClient 获取MongoDB客户端
-func GetClient() *mongo.Client {
+// getClient 获取MongoDB客户端的内部实现
+func getClient() *mongo.Client {
 	return client
 }
 

@@ -362,8 +362,8 @@ func (s *userService) UpdateUserProfile(ctx context.Context, id string, req *mod
 			}
 
 			// 验证文件大小
-			if len(imgData) > 2*1024*1024 { // 2MB
-				return nil, errors.New("头像大小不能超过2MB")
+			if len(imgData) > 10*1024*1024 { // 10MB
+				return nil, errors.New("头像大小不能超过10MB")
 			}
 
 			// 生成唯一文件名
@@ -381,8 +381,8 @@ func (s *userService) UpdateUserProfile(ctx context.Context, id string, req *mod
 		}
 	} else if avatar != nil { // 保留对multipart.FileHeader的处理以兼容旧代码
 		// 验证文件大小
-		if avatar.Size > 2*1024*1024 { // 2MB
-			return nil, errors.New("头像大小不能超过2MB")
+		if avatar.Size > 10*1024*1024 { // 2MB
+			return nil, errors.New("头像大小不能超过10MB")
 		}
 
 		// 验证文件类型
@@ -546,38 +546,107 @@ func (s *userService) AddToFavorites(ctx context.Context, userID, videoID string
 		return errors.New("已经收藏过该视频")
 	}
 
-	// 添加到收藏
-	favorite := model.Favorite{
-		ID:            primitive.NewObjectID(),
-		UserID:        userID,
-		VideoID:       videoID,
-		VideoTitle:    video.Title,
-		CoverURL:      video.CoverURL,
-		AddedAt:       time.Now(),
-		VideoDuration: video.Duration,
+	// 创建会话
+	session, err := database.GetClient().StartSession()
+	if err != nil {
+		return err
 	}
+	defer session.EndSession(ctx)
 
-	_, err = collection.InsertOne(ctx, favorite)
+	// 在事务中执行添加收藏和更新视频统计
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		// 1. 添加到收藏表
+		favorite := model.Favorite{
+			ID:            primitive.NewObjectID(),
+			UserID:        userID,
+			VideoID:       videoID,
+			VideoTitle:    video.Title,
+			CoverURL:      video.CoverURL,
+			AddedAt:       time.Now(),
+			VideoDuration: video.Duration,
+		}
+
+		_, err := collection.InsertOne(sessCtx, favorite)
+		if err != nil {
+			return nil, err
+		}
+
+		// 2. 更新视频的likes统计
+		update := bson.M{
+			"$inc": bson.M{
+				"stats.likes": 1,
+			},
+		}
+
+		_, err = videoCollection.UpdateOne(
+			sessCtx,
+			bson.M{"_id": objectID},
+			update,
+		)
+
+		return nil, err
+	})
+
 	return err
 }
 
 // RemoveFromFavorites 从收藏中移除
 func (s *userService) RemoveFromFavorites(ctx context.Context, userID, videoID string) error {
-	collection := database.GetCollection("favorites")
-
-	result, err := collection.DeleteOne(ctx, bson.M{
-		"user_id":  userID,
-		"video_id": videoID,
-	})
+	// 创建会话
+	session, err := database.GetClient().StartSession()
 	if err != nil {
 		return err
 	}
+	defer session.EndSession(ctx)
 
-	if result.DeletedCount == 0 {
-		return errors.New("收藏不存在")
+	// 准备集合
+	collection := database.GetCollection("favorites")
+	videoCollection := database.GetCollection("videos")
+
+	// 解析视频ID
+	objectID, err := primitive.ObjectIDFromHex(videoID)
+	if err != nil {
+		return fmt.Errorf("无效的ID格式: %w", err)
 	}
 
-	return nil
+	// 在事务中执行移除收藏和更新视频统计
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		// 1. 从收藏表中删除
+		result, err := collection.DeleteOne(sessCtx, bson.M{
+			"user_id":  userID,
+			"video_id": videoID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if result.DeletedCount == 0 {
+			return nil, errors.New("收藏不存在")
+		}
+
+		// 2. 更新视频的likes统计（减1，但确保不会小于0）
+		update := bson.M{
+			"$inc": bson.M{
+				"stats.likes": -1,
+			},
+		}
+
+		// 条件更新，确保likes不会小于0
+		filter := bson.M{
+			"_id":         objectID,
+			"stats.likes": bson.M{"$gt": 0},
+		}
+
+		_, err = videoCollection.UpdateOne(
+			sessCtx,
+			filter,
+			update,
+		)
+
+		return nil, err
+	})
+
+	return err
 }
 
 // isValidAvatarFormat 验证头像格式
