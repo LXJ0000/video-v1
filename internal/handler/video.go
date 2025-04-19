@@ -16,6 +16,7 @@ import (
 	"video-platform/pkg/response"
 
 	"github.com/gin-gonic/gin"
+	"log/slog"
 )
 
 type VideoHandler struct {
@@ -83,14 +84,50 @@ func (h *VideoHandler) Upload(c *gin.Context) {
 
 // GetByID 获取视频详情
 func (h *VideoHandler) GetByID(c *gin.Context) {
-	videoId := c.Param("videoId")
-	video, err := h.videoService.GetByID(c.Request.Context(), videoId)
-	if err != nil {
-		response.Fail(c, http.StatusNotFound, "视频不存在")
+	// 获取视频ID
+	videoID := c.Param("videoId")
+	if videoID == "" {
+		response.Fail(c, http.StatusBadRequest, "视频ID不能为空")
+		slog.Error("[GetByID] 视频ID为空")
 		return
 	}
 
-	response.Success(c, video)
+	// 获取视频详情
+	video, err := h.videoService.GetByID(c.Request.Context(), videoID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		slog.Error("[GetByID] 获取视频详情失败", "error", err)
+		return
+	}
+
+	// 如果是私有视频，需要验证权限
+	if video.Status != "public" {
+		userID, exists := c.Get("userId")
+		if !exists || userID.(string) != video.UserID {
+			response.Fail(c, http.StatusForbidden, "无权查看该视频")
+			slog.Error("[GetByID] 无权查看私有视频", "videoId", videoID)
+			return
+		}
+	}
+
+	// 构建响应数据
+	result := gin.H{
+		"video": video,
+	}
+
+	// 检查用户是否已收藏视频
+	userID, exists := c.Get("userId")
+	if exists && userID.(string) != "" {
+		// 获取用户服务实例
+		userService := service.NewUserService()
+		isFavorite, err := userService.CheckFavoriteStatus(c.Request.Context(), userID.(string), videoID)
+		if err == nil {
+			// 只在无错误时添加是否收藏信息
+			result["isFavorite"] = isFavorite
+		}
+	}
+
+	response.Success(c, result)
 }
 
 // Update 更新视频信息

@@ -35,6 +35,7 @@ type UserService interface {
 	AddToFavorites(ctx context.Context, userID, videoID string) error
 	RemoveFromFavorites(ctx context.Context, userID, videoID string) error
 	RecordWatchHistory(ctx context.Context, userID, videoID string) error
+	CheckFavoriteStatus(ctx context.Context, userID, videoID string) (bool, error)
 }
 
 type userService struct {
@@ -645,4 +646,23 @@ func (s *userService) RecordWatchHistory(ctx context.Context, userID, videoID st
 	// 执行更新
 	_, err = historyCollection.UpdateOne(ctx, filter, update, opts)
 	return err
+}
+
+// CheckFavoriteStatus 检查视频是否被用户收藏
+func (s *userService) CheckFavoriteStatus(ctx context.Context, userID, videoID string) (bool, error) {
+	// 如果没有userID或videoID则返回未收藏
+	if userID == "" || videoID == "" {
+		return false, nil
+	}
+	
+	collection := database.GetCollection("favorites")
+	count, err := collection.CountDocuments(ctx, bson.M{
+		"user_id":  userID,
+		"video_id": videoID,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
