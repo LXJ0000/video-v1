@@ -6,6 +6,7 @@ import (
 	"video-platform/config"
 	"video-platform/internal/handler"
 	"video-platform/pkg/database"
+	"video-platform/pkg/redis"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,6 +28,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer database.CloseMongoDB()
+	if err := redis.InitRedis(ctx, config.GlobalConfig.Redis.URI); err != nil {
+		log.Fatal(err)
+	}
+	defer redis.CloseRedis()
 
 	// 创建Gin引擎
 	r := gin.Default()

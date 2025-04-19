@@ -9,6 +9,7 @@ import (
 	"video-platform/pkg/redis"
 	"video-platform/pkg/sms"
 	"video-platform/script"
+	"video-platform/config"
 )
 
 type CodeService interface {
@@ -30,7 +31,8 @@ func (c *codeServiceImpl) Send(ctx context.Context, biz, number string) error {
 		slog.Error("set code error", "error", err.Error(), "biz", biz, "number", number, "code", code)
 		return err
 	}
-	if err := c.sms.Send(ctx, "SMS_474870192", []sms.Param{{Name: "code", Value: code}}, number); err != nil {
+	templateID := config.GlobalConfig.SMS.TemplateID
+	if err := c.sms.Send(ctx, templateID, []sms.Param{{Name: "code", Value: code}}, number); err != nil {
 		// redis set 成功，sms 发送失败 不能刪除 redis key 因为错误有可能是超时错误... 即短信发送成功，但是返回超时
 		// 解决方案一：重试 让调用者自己决定重试方案 即sms 缺陷：用户重复收到验证码；一直重复一直失败，系统负载高
 		// 解决方案二：

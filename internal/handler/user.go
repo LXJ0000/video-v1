@@ -3,10 +3,11 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"video-platform/config"
 	"video-platform/internal/model"
 	"video-platform/internal/service"
 	"video-platform/pkg/response"
-	"video-platform/pkg/sms/local"
+	"video-platform/pkg/sms/aliyun"
 
 	"strconv"
 
@@ -25,7 +26,8 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 
 	return &UserHandler{
 		userService: userService,
-		codeService: service.NewCodeSerivce(local.NewService()), // 使用默认的短信服务
+		// codeService: service.NewCodeSerivce(local.NewService()),
+		codeService: service.NewCodeSerivce(aliyun.NewService(config.GlobalConfig.SMS.AppID, config.GlobalConfig.SMS.SignName, aliyun.NewAliyunClient())), // 使用默认的短信服务
 	}
 }
 

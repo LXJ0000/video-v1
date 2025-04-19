@@ -17,6 +17,7 @@ type Config struct {
 	Storage StorageConfig
 	JWT     JWTConfig
 	Redis   RedisConfig
+	SMS     SMSConfig
 }
 
 // MongoDBConfig MongoDB配置
@@ -47,6 +48,15 @@ type JWTConfig struct {
 // RedisConfig Redis配置
 type RedisConfig struct {
 	URI string
+}
+
+// SMSConfig 短信服务配置
+type SMSConfig struct {
+	AppID      string
+	SignName   string
+	TemplateID string
+	Endpoint   string
+	RegionID   string
 }
 
 var GlobalConfig Config
@@ -110,6 +120,13 @@ func Init() error {
 		},
 		Redis: RedisConfig{
 			URI: getEnvString("REDIS_URI", "redis://localhost:6379/0"),
+		},
+		SMS: SMSConfig{
+			AppID:      getEnvString("SMS_APP_ID", ""),
+			SignName:   getEnvString("SMS_SIGN_NAME", ""),
+			TemplateID: getEnvString("SMS_TEMPLATE_ID", ""),
+			Endpoint:   getEnvString("SMS_ENDPOINT", "dysmsapi.aliyuncs.com"),
+			RegionID:   getEnvString("SMS_REGION_ID", "cn-shenzhen"),
 		},
 	}
 
