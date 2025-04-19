@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -337,19 +339,97 @@ func (s *videoService) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	// 删除数据库记录
-	result, err := database.GetCollection(s.collection).DeleteOne(ctx, bson.M{"_id": objectID})
+	// 使用事务确保数据一致性
+	session, err := database.GetClient().StartSession()
+	if err != nil {
+		return fmt.Errorf("无法启动数据库会话: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	// 在事务中执行所有删除操作
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		// 1. 删除相关收藏记录
+		_, err := database.GetCollection("favorites").DeleteMany(
+			sessCtx,
+			bson.M{"video_id": id},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("删除收藏记录失败: %w", err)
+		}
+
+		// 2. 删除相关观看历史
+		_, err = database.GetCollection("watch_history").DeleteMany(
+			sessCtx,
+			bson.M{"video_id": id},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("删除观看历史失败: %w", err)
+		}
+
+		// 3. 删除相关评论
+		_, err = database.GetCollection("comments").DeleteMany(
+			sessCtx,
+			bson.M{"video_id": id},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("删除评论失败: %w", err)
+		}
+
+		// 4. 删除相关标记和注释
+		_, err = database.GetCollection("marks").DeleteMany(
+			sessCtx,
+			bson.M{"video_id": id},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("删除标记失败: %w", err)
+		}
+
+		_, err = database.GetCollection("annotations").DeleteMany(
+			sessCtx,
+			bson.M{"video_id": id},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("删除注释失败: %w", err)
+		}
+
+		// 5. 最后删除视频记录本身
+		result, err := database.GetCollection(s.collection).DeleteOne(
+			sessCtx,
+			bson.M{"_id": objectID},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("删除视频记录失败: %w", err)
+		}
+
+		if result.DeletedCount == 0 {
+			return nil, errors.New("视频不存在")
+		}
+
+		return nil, nil
+	})
+
 	if err != nil {
 		return err
 	}
 
-	if result.DeletedCount == 0 {
-		return errors.New("视频不存在")
+	// 删除视频文件(事务外执行文件系统操作)
+	filePath := filepath.Join(config.GlobalConfig.Storage.UploadDir, video.FileName)
+	if err := os.Remove(filePath); err != nil {
+		// 文件删除失败，但数据库记录已删除，记录错误但继续执行
+		log.Printf("WARNING: 视频文件删除失败(%s): %v", filePath, err)
 	}
 
-	// 删除文件
-	filePath := filepath.Join(config.GlobalConfig.Storage.UploadDir, video.FileName)
-	return os.Remove(filePath)
+	// 删除缩略图文件(如果存在)
+	if video.CoverURL != "" {
+		coverFileName := filepath.Base(video.CoverURL)
+		coverPath := filepath.Join(config.GlobalConfig.Storage.UploadDir, coverFileName)
+		if err := os.Remove(coverPath); err != nil {
+			// 缩略图删除失败，只记录日志不影响主流程
+			log.Printf("WARNING: 视频缩略图删除失败(%s): %v", coverPath, err)
+		}
+	}
+
+	return nil
 }
 
 // BatchOperation 批量操作视频
