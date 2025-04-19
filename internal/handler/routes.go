@@ -25,6 +25,7 @@ func InitRoutes(r *gin.Engine) {
 		userService := service.NewUserService()
 		markService := service.NewMarkService()
 		videoService := service.NewVideoService()
+		// codeService := service.NewCodeSerivce(nil)
 
 		// 创建 handler 实例
 		userHandler := NewUserHandler(userService)
