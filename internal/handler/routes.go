@@ -41,6 +41,8 @@ func InitRoutes(r *gin.Engine) {
 			users.PUT("/:userId/profile", middleware.Auth(), userHandler.UpdateUserProfile)
 			users.GET("/:userId/watch-history", middleware.Auth(), userHandler.GetWatchHistory)
 			users.GET("/:userId/favorites", middleware.Auth(), userHandler.GetFavorites)
+			users.POST("/send_sms_code", userHandler.SendSMSCode)
+			users.POST("/login/sms", userHandler.LoginBySms)
 		}
 
 		// 公开接口（无需认证）

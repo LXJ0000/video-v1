@@ -87,6 +87,63 @@
   - 401: 用户名或密码错误
   - 403: 账号被禁用
 
+### 发送短信验证码
+- 请求方式: `POST`
+- 路径: `/users/sms-code`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "phone": "string"  // 手机号码，例如：13800138000
+}
+```
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "message": "验证码已发送"
+    }
+}
+```
+- 错误情况:
+  - 400: 参数不合法或手机号格式错误
+  - 429: 请求过于频繁，请稍后再试
+
+### 短信验证码登录
+- 请求方式: `POST`
+- 路径: `/users/login/sms`
+- Content-Type: `application/json`
+- 请求体:
+```json
+{
+    "phone": "string",  // 手机号码
+    "code": "string"    // 短信验证码
+}
+```
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "登录成功",
+    "data": {
+        "token": "string", // JWT令牌
+        "user": {
+            "id": "string",
+            "username": "string",
+            "phone": "string",
+            "email": "string",
+            "status": 1
+        }
+    }
+}
+```
+- 错误情况:
+  - 400: 参数不合法或手机号格式错误
+  - 401: 验证码错误或已过期
+  - 403: 账号被禁用
+
 ### 刷新令牌
 - 请求方式: `POST`
 - 路径: `/users/refresh-token`

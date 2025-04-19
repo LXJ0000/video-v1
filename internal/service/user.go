@@ -36,6 +36,7 @@ type UserService interface {
 	RemoveFromFavorites(ctx context.Context, userID, videoID string) error
 	RecordWatchHistory(ctx context.Context, userID, videoID string) error
 	CheckFavoriteStatus(ctx context.Context, userID, videoID string) (bool, error)
+	LoginOrRegisterByPhone(ctx context.Context, phone string) (*model.User, string, error)
 }
 
 type userService struct {
@@ -737,4 +738,47 @@ func (s *userService) CheckFavoriteStatus(ctx context.Context, userID, videoID s
 	}
 
 	return count > 0, nil
+}
+
+// LoginOrRegisterByPhone 通过手机号登录或注册
+func (s *userService) LoginOrRegisterByPhone(ctx context.Context, phone string) (*model.User, string, error) {
+	collection := database.GetCollection(s.collection)
+	var user model.User
+	
+	// 先查找是否已存在该手机号的用户
+	err := collection.FindOne(ctx, bson.M{"phone": phone}).Decode(&user)
+	if err != nil {
+		// 用户不存在，创建新用户
+		if err == mongo.ErrNoDocuments {
+			// 设置默认用户名为手机号 + 随机数字
+			randomStr := fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+			username := "user_" + phone[len(phone)-4:] + "_" + randomStr
+			
+			user = model.User{
+				ID:        primitive.NewObjectID(),
+				Username:  username,
+				Phone:     phone,
+				Password:  "", // 手机号登录无需密码
+				Status:    1,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+			
+			_, err = collection.InsertOne(ctx, user)
+			if err != nil {
+				return nil, "", fmt.Errorf("创建用户失败: %w", err)
+			}
+		} else {
+			// 其他错误
+			return nil, "", fmt.Errorf("数据库查询错误: %w", err)
+		}
+	}
+	
+	// 生成 JWT token
+	token, err := utils.GenerateToken(user.ID.Hex(), user.Username)
+	if err != nil {
+		return nil, "", fmt.Errorf("生成token失败: %w", err)
+	}
+	
+	return &user, token, nil
 }

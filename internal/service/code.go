@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"video-platform/pkg/redis"
 	"video-platform/pkg/sms"
+	"video-platform/script"
 )
 
 type CodeService interface {
@@ -47,9 +50,40 @@ func (c *codeServiceImpl) genCode() string {
 }
 
 func (r *codeServiceImpl) SetCode(ctx context.Context, biz, number, code string) error {
-	return nil
+	codeKey := fmt.Sprintf("code:%s:%s", biz, number)
+	cache := redis.GetClient()
+	res, err := cache.Eval(ctx, script.LuaSendCode, []string{codeKey}, code).Int()
+	if err != nil {
+		slog.Error("set code error", "error", err.Error())
+		return err
+	}
+	switch res {
+	case 0:
+		return nil
+	case -2:
+		slog.Error("set code error", "error", "code send too frequently")
+		return errors.New("code send too frequently")
+	default:
+		return errors.New("系统错误")
+	}
 }
 
 func (r *codeServiceImpl) VerifyCode(ctx context.Context, biz, number, code string) (bool, error) {
-	return true, nil
+	codeKey := fmt.Sprintf("code:%s:%s", biz, number)
+	cache := redis.GetClient()
+	res, err := cache.Eval(ctx, script.LuaVerifyCode, []string{codeKey}, code).Int()
+	if err != nil {
+		slog.Error("verify code error", "error", err.Error())
+		return false, err
+	}
+	switch res {
+	case 0:
+		return true, nil
+	case -1:
+		return false, errors.New("code verify too frequently")
+	case -2:
+		return false, nil
+	default:
+		return false, errors.New("未知错误")
+	}
 }

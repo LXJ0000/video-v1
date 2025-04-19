@@ -6,6 +6,7 @@ import (
 	"video-platform/internal/model"
 	"video-platform/internal/service"
 	"video-platform/pkg/response"
+	"video-platform/pkg/sms/local"
 
 	"strconv"
 
@@ -14,15 +15,96 @@ import (
 
 type UserHandler struct {
 	userService service.UserService
+	codeService service.CodeService
 }
 
 func NewUserHandler(userService service.UserService) *UserHandler {
 	if userService == nil {
 		userService = service.NewUserService()
 	}
+
 	return &UserHandler{
 		userService: userService,
+		codeService: service.NewCodeSerivce(local.NewService()), // 使用默认的短信服务
 	}
+}
+
+func (h *UserHandler) SendSMSCode(c *gin.Context) {
+	type SendSMSCodeReq struct {
+		Phone string `form:"phone" json:"phone" binding:"required"`
+	}
+	var req SendSMSCodeReq
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, "无效的请求参数")
+		slog.Error("[SendSMSCode] 无效的请求参数", "error", err)
+		return
+	}
+
+	// 验证手机号格式
+	if len(req.Phone) != 11 {
+		response.Fail(c, http.StatusBadRequest, "无效的手机号码")
+		slog.Error("[SendSMSCode] 无效的手机号码", "phone", req.Phone)
+		return
+	}
+
+	// 发送短信验证码
+	err := h.codeService.Send(c.Request.Context(), "login", req.Phone)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "发送验证码失败: "+err.Error())
+		slog.Error("[SendSMSCode] 发送验证码失败", "error", err, "phone", req.Phone)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "验证码已发送"})
+}
+
+func (h *UserHandler) LoginBySms(c *gin.Context) {
+	type LoginBySmsReq struct {
+		Phone string `form:"phone" json:"phone" binding:"required"`
+		Code  string `form:"code" json:"code" binding:"required"`
+	}
+	var req LoginBySmsReq
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, "无效的请求参数")
+		slog.Error("[LoginBySms] 无效的请求参数", "error", err)
+		return
+	}
+
+	// 验证手机号格式
+	if len(req.Phone) != 11 {
+		response.Fail(c, http.StatusBadRequest, "无效的手机号码")
+		slog.Error("[LoginBySms] 无效的手机号码", "phone", req.Phone)
+		return
+	}
+
+	// 验证验证码
+	verified, err := h.codeService.Verify(c.Request.Context(), "login", req.Phone, req.Code)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "验证码验证失败: "+err.Error())
+		slog.Error("[LoginBySms] 验证码验证失败", "error", err, "phone", req.Phone)
+		return
+	}
+
+	if !verified {
+		response.Fail(c, http.StatusUnauthorized, "验证码错误或已过期")
+		slog.Error("[LoginBySms] 验证码错误或已过期", "phone", req.Phone)
+		return
+	}
+
+	// 验证通过，执行登录或注册流程
+	user, token, err := h.userService.LoginOrRegisterByPhone(c.Request.Context(), req.Phone)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "登录失败: "+err.Error())
+		slog.Error("[LoginBySms] 登录失败", "error", err, "phone", req.Phone)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"user":  user,
+		"token": token,
+	})
 }
 
 // Register 用户注册

@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 	"video-platform/internal/model"
@@ -79,6 +80,26 @@ func (m *MockUserService) RecordWatchHistory(ctx context.Context, userID, videoI
 
 func (m *MockUserService) CheckFavoriteStatus(ctx context.Context, userID, videoID string) (bool, error) {
 	args := m.Called(ctx, userID, videoID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockUserService) LoginOrRegisterByPhone(ctx context.Context, phone string) (*model.User, string, error) {
+	args := m.Called(ctx, phone)
+	return args.Get(0).(*model.User), args.String(1), args.Error(2)
+}
+
+// 创建MockCodeService
+type MockCodeService struct {
+	mock.Mock
+}
+
+func (m *MockCodeService) Send(ctx context.Context, biz, number string) error {
+	args := m.Called(ctx, biz, number)
+	return args.Error(0)
+}
+
+func (m *MockCodeService) Verify(ctx context.Context, biz, number, code string) (bool, error) {
+	args := m.Called(ctx, biz, number, code)
 	return args.Bool(0), args.Error(1)
 }
 
@@ -267,4 +288,84 @@ func TestCheckFavoriteStatus(t *testing.T) {
 
 	// 验证调用
 	mockService.AssertExpectations(t)
+}
+
+// 测试发送验证码
+func TestSendSMSCode(t *testing.T) {
+	c, w, _, _ := setupUserTest()
+	
+	// 创建mock服务
+	mockUserService := new(MockUserService)
+	mockCodeService := new(MockCodeService)
+	handler := &UserHandler{
+		userService: mockUserService,
+		codeService: mockCodeService,
+	}
+	
+	// 创建请求体
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(`{"phone":"13800138000"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	
+	// 设置期望
+	mockCodeService.On("Send", mock.Anything, "login", "13800138000").Return(nil)
+	
+	// 执行测试
+	handler.SendSMSCode(c)
+	
+	// 验证响应
+	assert.Equal(t, http.StatusOK, w.Code)
+	
+	var resp response.Response
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	assert.Nil(t, err)
+	assert.Equal(t, 0, resp.Code)
+	
+	// 验证调用
+	mockCodeService.AssertExpectations(t)
+}
+
+// 测试短信验证码登录
+func TestLoginBySms(t *testing.T) {
+	c, w, _, _ := setupUserTest()
+	
+	// 创建mock服务
+	mockUserService := new(MockUserService)
+	mockCodeService := new(MockCodeService)
+	handler := &UserHandler{
+		userService: mockUserService,
+		codeService: mockCodeService,
+	}
+	
+	// 模拟用户数据和token
+	userId := primitive.NewObjectID()
+	user := &model.User{
+		ID:       userId,
+		Username: "user_8000_123456",
+		Phone:    "13800138000",
+		Status:   1,
+	}
+	token := "test_token"
+	
+	// 创建请求体
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(`{"phone":"13800138000","code":"123456"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	
+	// 设置期望
+	mockCodeService.On("Verify", mock.Anything, "login", "13800138000", "123456").Return(true, nil)
+	mockUserService.On("LoginOrRegisterByPhone", mock.Anything, "13800138000").Return(user, token, nil)
+	
+	// 执行测试
+	handler.LoginBySms(c)
+	
+	// 验证响应
+	assert.Equal(t, http.StatusOK, w.Code)
+	
+	var resp response.Response
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	assert.Nil(t, err)
+	assert.Equal(t, 0, resp.Code)
+	
+	// 验证调用
+	mockCodeService.AssertExpectations(t)
+	mockUserService.AssertExpectations(t)
 }
