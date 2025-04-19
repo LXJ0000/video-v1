@@ -412,26 +412,29 @@
     "code": 0,
     "msg": "success",
     "data": {
-        "id": "string",
-        "userId": "string",
-        "title": "string",
-        "description": "string",
-        "fileName": "string",
-        "fileSize": 1024000,
-        "format": "mp4",
-        "duration": 180.5,
-        "status": "public",
-        "coverUrl": "string",
-        "thumbnailUrl": "string",
-        "tags": ["标签1", "标签2"],
-        "stats": {
-            "views": 1000,
-            "likes": 100,
-            "comments": 50,
-            "shares": 20
+        "video": {
+            "id": "string",
+            "userId": "string",
+            "title": "string",
+            "description": "string",
+            "fileName": "string",
+            "fileSize": 1024000,
+            "format": "mp4",
+            "duration": 180.5,
+            "status": "public",
+            "coverUrl": "string",
+            "thumbnailUrl": "string",
+            "tags": ["标签1", "标签2"],
+            "stats": {
+                "views": 1000,
+                "likes": 100,
+                "comments": 50,
+                "shares": 20
+            },
+            "createdAt": "2024-02-26T10:00:00Z",
+            "updatedAt": "2024-02-26T10:00:00Z"
         },
-        "createdAt": "2024-02-26T10:00:00Z",
-        "updatedAt": "2024-02-26T10:00:00Z"
+        "isFavorite": true  // 当用户已登录时，返回该用户是否已收藏此视频
     }
 }
 ```

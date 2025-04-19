@@ -266,6 +266,9 @@ func (m *MockUserService) GetUserProfile(ctx context.Context, id string) (*model
 - ✅ 视频流式播放
 - ✅ 视频列表查询（支持分页、排序、搜索）
 - ✅ 视频详情获取
+  - ✅ 支持获取基本信息和播放地址
+  - ✅ 支持获取统计数据
+  - ✅ 支持获取当前用户的收藏状态
 
 ### 视频管理
 - ✅ 视频管理（列表、详情、修改、删除）
@@ -393,6 +396,28 @@ func (m *MockUserService) GetUserProfile(ctx context.Context, id string) (*model
    - 错误提示要清晰明确
    - 安全性和用户体验要平衡
    - 日志记录要包含关键信息
+
+### 2024-04-21 用户收藏状态功能实现
+1. 视频详情功能增强
+   - 新增返回用户收藏状态
+   - 优化查询性能
+   - 添加单元测试
+   - 更新API文档
+
+2. 用户服务改进
+   - 新增`CheckFavoriteStatus`方法
+   - 优化数据库查询
+   - 增加测试用例
+
+3. 测试架构优化
+   - 修复依赖注入问题
+   - 优化模拟对象
+   - 提高测试覆盖率
+
+4. API文档更新
+   - 添加视频收藏状态说明
+   - 完善响应示例
+   - 更新接口参数说明
 
 ## 项目结构
 ```
@@ -530,22 +555,25 @@ func (m *MockUserService) GetUserProfile(ctx context.Context, id string) (*model
     "code": 0,
     "msg": "success",
     "data": {
-        "id": "视频ID",
-        "title": "视频标题",
-        "description": "视频描述",
-        "fileSize": 1024,
-        "format": "mp4",
-        "status": "public",
-        "tags": ["标签1", "标签2"],
-        "thumbnailUrl": "缩略图URL",
-        "stats": {
-            "views": 100,
-            "likes": 50,
-            "comments": 20,
-            "shares": 10
+        "video": {
+            "id": "视频ID",
+            "title": "视频标题",
+            "description": "视频描述",
+            "fileSize": 1024,
+            "format": "mp4",
+            "status": "public",
+            "tags": ["标签1", "标签2"],
+            "thumbnailUrl": "缩略图URL",
+            "stats": {
+                "views": 100,
+                "likes": 50,
+                "comments": 20,
+                "shares": 10
+            },
+            "createdAt": "2024-01-20T10:00:00Z",
+            "updatedAt": "2024-01-20T10:00:00Z"
         },
-        "createdAt": "2024-01-20T10:00:00Z",
-        "updatedAt": "2024-01-20T10:00:00Z"
+        "isFavorite": true  // 当用户已登录时，返回用户是否已收藏此视频
     }
 }
 ```
