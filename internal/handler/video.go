@@ -15,8 +15,9 @@ import (
 	"video-platform/internal/service"
 	"video-platform/pkg/response"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
+
+	"github.com/gin-gonic/gin"
 )
 
 type VideoHandler struct {
@@ -115,12 +116,14 @@ func (h *VideoHandler) GetByID(c *gin.Context) {
 		"video": video,
 	}
 
+	// 获取用户服务实例 - 使用依赖注入方式，易于测试
+	userSvc := getUserService()
+
 	// 检查用户是否已收藏视频
 	userID, exists := c.Get("userId")
-	if exists && userID.(string) != "" {
-		// 获取用户服务实例
-		userService := service.NewUserService()
-		isFavorite, err := userService.CheckFavoriteStatus(c.Request.Context(), userID.(string), videoID)
+	if exists && userID.(string) != "" && userSvc != nil {
+		// 查询收藏状态
+		isFavorite, err := userSvc.CheckFavoriteStatus(c.Request.Context(), userID.(string), videoID)
 		if err == nil {
 			// 只在无错误时添加是否收藏信息
 			result["isFavorite"] = isFavorite
@@ -128,6 +131,11 @@ func (h *VideoHandler) GetByID(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+// getUserService 获取用户服务实例，提供依赖注入点，方便测试
+var getUserService = func() service.UserService {
+	return service.NewUserService()
 }
 
 // Update 更新视频信息

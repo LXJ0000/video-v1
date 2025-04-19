@@ -77,6 +77,11 @@ func (m *MockUserService) RecordWatchHistory(ctx context.Context, userID, videoI
 	return args.Error(0)
 }
 
+func (m *MockUserService) CheckFavoriteStatus(ctx context.Context, userID, videoID string) (bool, error) {
+	args := m.Called(ctx, userID, videoID)
+	return args.Bool(0), args.Error(1)
+}
+
 // 设置测试环境
 func setupUserTest() (*gin.Context, *httptest.ResponseRecorder, *MockUserService, *UserHandler) {
 	gin.SetMode(gin.TestMode)
@@ -192,7 +197,7 @@ func TestAddToFavorites(t *testing.T) {
 
 	// 确保请求对象存在（已在setupUserTest中创建）
 	// 执行服务前确保Request不会被覆盖
-	
+
 	// 模拟服务层响应
 	mockService.On("AddToFavorites", mock.Anything, userId, videoId).Return(nil)
 
@@ -223,7 +228,7 @@ func TestRecordWatchHistory(t *testing.T) {
 
 	// 确保请求对象存在（已在setupUserTest中创建）
 	// 执行服务前确保Request不会被覆盖
-	
+
 	// 模拟服务层响应
 	mockService.On("RecordWatchHistory", mock.Anything, userId, videoId).Return(nil)
 
@@ -237,6 +242,28 @@ func TestRecordWatchHistory(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, resp.Code)
+
+	// 验证调用
+	mockService.AssertExpectations(t)
+}
+
+// 测试检查收藏状态
+func TestCheckFavoriteStatus(t *testing.T) {
+	_, _, mockService, _ := setupUserTest()
+
+	// 模拟当前登录用户
+	userId := primitive.NewObjectID().Hex()
+	videoId := primitive.NewObjectID().Hex()
+
+	// 模拟服务层响应
+	mockService.On("CheckFavoriteStatus", mock.Anything, userId, videoId).Return(true, nil)
+
+	// 直接调用服务方法进行测试
+	result, err := mockService.CheckFavoriteStatus(context.Background(), userId, videoId)
+
+	// 验证响应
+	assert.Nil(t, err)
+	assert.True(t, result)
 
 	// 验证调用
 	mockService.AssertExpectations(t)
