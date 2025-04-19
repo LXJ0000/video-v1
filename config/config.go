@@ -21,7 +21,8 @@ type MongoDBConfig struct {
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Port int
+	Port         int
+	AllowOrigins string // 允许的跨域源，为空时允许所有源
 }
 
 // StorageConfig 存储配置
@@ -48,7 +49,8 @@ func Init() error {
 			TestDatabase: "video_platform_test", // 测试数据库
 		},
 		Server: ServerConfig{
-			Port: 8080,
+			Port:         8080,
+			AllowOrigins: "*", // 默认允许所有源
 		},
 		Storage: StorageConfig{
 			UploadDir: "./uploads",
