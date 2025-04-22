@@ -1211,3 +1211,433 @@ var (
     )
 )
 ```
+
+## 系统架构图
+
+### 前端架构图
+```
+@startuml
+package "前端应用" {
+  [Vue 3 应用] as VueApp
+  [Pinia 状态管理] as Pinia
+  [Vue Router] as Router
+  [Element Plus UI] as ElementUI
+  [Video.js 播放器] as VideoJS
+  
+  VueApp --> Pinia : 使用
+  VueApp --> Router : 使用
+  VueApp --> ElementUI : 使用
+  VueApp --> VideoJS : 使用
+  
+  package "视频模块" as VideoModule {
+    [视频播放组件] as VideoPlayer
+    [视频列表组件] as VideoList
+    [视频上传组件] as VideoUpload
+    
+    VideoPlayer --> VideoJS : 基于
+  }
+  
+  package "标记笔记模块" as MarkModule {
+    [标记编辑器] as MarkEditor
+    [标记列表] as MarkList
+    [笔记编辑器] as NoteEditor
+    [导出工具] as ExportTool
+  }
+  
+  package "用户模块" as UserModule {
+    [用户认证] as UserAuth
+    [个人资料] as UserProfile
+    [收藏管理] as Favorites
+  }
+  
+  VueApp --> VideoModule : 包含
+  VueApp --> MarkModule : 包含
+  VueApp --> UserModule : 包含
+}
+
+package "API请求" {
+  [Axios客户端] as Axios
+  [请求拦截器] as RequestInterceptor
+  [响应拦截器] as ResponseInterceptor
+  
+  Axios --> RequestInterceptor : 使用
+  Axios --> ResponseInterceptor : 使用
+}
+
+VueApp --> Axios : HTTP请求
+
+cloud "后端服务" {
+  [RESTful API] as API
+}
+
+Axios --> API : 发送请求
+@enduml
+```
+
+### 数据流图
+```
+@startuml
+actor 用户
+participant "前端应用" as Frontend
+participant "API网关" as API
+participant "用户服务" as UserService
+participant "视频服务" as VideoService
+participant "标记服务" as MarkService
+database "MongoDB" as DB
+collections "Redis缓存" as Cache
+
+== 用户登录流程 ==
+用户 -> Frontend: 输入用户名和密码
+Frontend -> API: 发送登录请求
+API -> UserService: 验证用户凭据
+UserService -> DB: 查询用户信息
+DB -> UserService: 返回用户数据
+UserService -> UserService: 验证密码
+UserService -> API: 生成JWT令牌
+API -> Frontend: 返回令牌和用户信息
+Frontend -> Frontend: 存储令牌
+
+== 视频播放流程 ==
+用户 -> Frontend: 选择视频
+Frontend -> API: 请求视频详情
+API -> VideoService: 获取视频信息
+VideoService -> Cache: 查询缓存
+Cache -> VideoService: 返回缓存结果(未命中)
+VideoService -> DB: 查询视频数据
+DB -> VideoService: 返回视频信息
+VideoService -> Cache: 更新缓存
+VideoService -> API: 返回视频详情
+API -> Frontend: 返回视频详情
+Frontend -> API: 请求视频流
+API -> VideoService: 流式传输视频
+VideoService -> Frontend: 返回视频流
+Frontend -> Frontend: 播放视频
+
+== 添加标记流程 ==
+用户 -> Frontend: 在视频上创建标记
+Frontend -> API: 发送标记数据
+API -> MarkService: 创建标记
+MarkService -> DB: 存储标记数据
+DB -> MarkService: 确认存储成功
+MarkService -> API: 返回标记信息
+API -> Frontend: 返回标记详情
+Frontend -> Frontend: 更新标记列表
+@enduml
+```
+
+### 后端处理流程图
+```
+@startuml
+participant "客户端" as Client
+participant "Gin路由" as Gin
+participant "认证中间件" as Auth
+participant "处理器" as Handler
+participant "服务层" as Service
+participant "MongoDB" as DB
+participant "Redis缓存" as Cache
+participant "文件系统" as FS
+
+== 视频上传流程 ==
+Client -> Gin: 发送视频上传请求(POST /videos)
+Gin -> Auth: 验证请求token
+Auth -> Gin: 验证通过，添加userId到上下文
+Gin -> Handler: 调用上传处理器
+Handler -> Handler: 检查请求参数和文件类型
+Handler -> Service: 调用视频服务上传方法
+Service -> FS: 保存视频文件
+FS -> Service: 返回文件路径
+Service -> DB: 创建视频记录
+DB -> Service: 返回新创建的视频ID
+Service -> Handler: 返回上传结果
+Handler -> Client: 返回成功响应(视频详情)
+
+== 视频流播放流程 ==
+Client -> Gin: 请求视频流(GET /videos/:id/stream)
+Gin -> Handler: 调用流处理器
+Handler -> Service: 获取视频信息
+Service -> DB: 查询视频记录
+DB -> Service: 返回视频数据
+Service -> Handler: 返回视频信息
+Handler -> FS: 打开视频文件
+Handler -> Handler: 处理Range请求头
+Handler -> Client: 流式返回视频数据(206 Partial Content)
+
+== 收藏视频流程 ==
+Client -> Gin: 添加收藏请求(POST /videos/:id/favorite)
+Gin -> Auth: 验证请求token
+Auth -> Gin: 验证通过，添加userId到上下文
+Gin -> Handler: 调用收藏处理器
+Handler -> Service: 调用用户服务添加收藏方法
+Service -> DB: 开始数据库事务
+DB -> Service: 返回事务会话
+Service -> DB: 添加收藏记录
+Service -> DB: 更新视频点赞计数
+DB -> Service: 提交事务
+Service -> Handler: 返回操作结果
+Handler -> Client: 返回成功响应
+@enduml
+```
+
+## 技术实现重点
+
+### MongoDB事务支持实现
+
+为确保数据一致性，项目中的关键操作(如添加/取消收藏同步更新点赞数)使用MongoDB事务：
+
+```go
+// 使用事务包装收藏和点赞操作的示例
+func (s *UserService) AddToFavorites(ctx context.Context, videoID, userID string) error {
+    // 1. 开始事务会话
+    session, err := database.GetClient().StartSession()
+    if err != nil {
+        return err
+    }
+    defer session.EndSession(ctx)
+
+    // 2. 在事务内执行多个操作
+    _, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+        // 2.1 验证视频存在性
+        video, err := s.getVideoByID(sessCtx, videoID)
+        if err != nil {
+            return nil, err
+        }
+
+        // 2.2 检查是否已收藏
+        count, err := database.GetCollection("favorites").CountDocuments(
+            sessCtx,
+            bson.M{"user_id": userID, "video_id": videoID},
+        )
+        if err != nil {
+            return nil, err
+        }
+        if count > 0 {
+            return nil, errors.New("已经收藏过该视频")
+        }
+
+        // 2.3 添加收藏记录
+        favorite := model.Favorite{
+            ID:        primitive.NewObjectID(),
+            UserID:    userID,
+            VideoID:   videoID,
+            CreatedAt: time.Now(),
+        }
+        _, err = database.GetCollection("favorites").InsertOne(sessCtx, favorite)
+        if err != nil {
+            return nil, err
+        }
+
+        // 2.4 增加视频点赞计数
+        _, err = database.GetCollection("videos").UpdateOne(
+            sessCtx,
+            bson.M{"_id": video.ID},
+            bson.M{"$inc": bson.M{"stats.likes": 1}},
+        )
+        return nil, err
+    })
+
+    return err
+}
+```
+
+### 视频流式传输与断点续传实现
+
+视频流式传输使用HTTP Range请求实现，支持断点续传和播放进度控制：
+
+```go
+// 视频流式播放的核心实现
+func (h *VideoHandler) Stream(c *gin.Context) {
+    videoID := c.Param("videoId")
+    
+    // 获取视频信息
+    video, err := h.videoService.GetByID(c, videoID)
+    if err != nil {
+        response.Fail(c, "视频不存在")
+        return
+    }
+    
+    // 获取文件路径
+    filePath := filepath.Join(config.GlobalConfig.Storage.UploadDir, video.FileName)
+    
+    // 打开文件
+    file, err := os.Open(filePath)
+    if err != nil {
+        response.Fail(c, "视频文件不存在")
+        return
+    }
+    defer file.Close()
+    
+    // 获取文件信息
+    fileInfo, err := file.Stat()
+    if err != nil {
+        response.Fail(c, "无法获取文件信息")
+        return
+    }
+    
+    // 设置内容类型
+    c.Header("Content-Type", fmt.Sprintf("video/%s", video.Format))
+    c.Header("Accept-Ranges", "bytes")
+    
+    // 处理Range请求
+    rangeHeader := c.Request.Header.Get("Range")
+    if rangeHeader != "" {
+        // 解析Range头
+        ranges, err := parseRange(rangeHeader, fileInfo.Size())
+        if err != nil {
+            c.Status(http.StatusRequestedRangeNotSatisfiable)
+            return
+        }
+        
+        // 只处理第一个范围请求
+        if len(ranges) > 0 {
+            start, end := ranges[0][0], ranges[0][1]
+            
+            // 设置部分内容响应头
+            c.Status(http.StatusPartialContent)
+            c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileInfo.Size()))
+            c.Header("Content-Length", fmt.Sprintf("%d", end-start+1))
+            
+            // 定位到指定位置
+            file.Seek(start, io.SeekStart)
+            
+            // 限制读取长度
+            io.CopyN(c.Writer, file, end-start+1)
+            return
+        }
+    }
+    
+    // 如果不是Range请求，发送整个文件
+    c.Header("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+    io.Copy(c.Writer, file)
+}
+```
+
+### 模块化设计与依赖注入
+
+项目采用接口驱动设计，服务层通过接口实现依赖注入，便于模块解耦和单元测试：
+
+```go
+// 定义服务接口
+type VideoService interface {
+    Upload(ctx context.Context, videoFile *multipart.FileHeader, coverFile *multipart.FileHeader, info model.Video) (*model.Video, error)
+    GetList(ctx context.Context, query model.VideoQuery) (*model.VideoList, error)
+    GetByID(ctx context.Context, id string) (*model.Video, error)
+    Update(ctx context.Context, id string, video model.Video) error
+    Delete(ctx context.Context, id string) error
+    // ... 其他方法
+}
+
+// 处理器依赖服务接口，而非具体实现
+type VideoHandler struct {
+    videoService VideoService
+    userService  UserService
+}
+
+// 通过构造函数注入依赖
+func NewVideoHandler(videoService VideoService, userService UserService) *VideoHandler {
+    return &VideoHandler{
+        videoService: videoService,
+        userService:  userService,
+    }
+}
+
+// 路由初始化中使用依赖注入
+func InitRoutes(r *gin.Engine) {
+    // 创建服务实例
+    userService := service.NewUserService()
+    videoService := service.NewVideoService()
+    
+    // 创建处理器实例，注入服务依赖
+    userHandler := handler.NewUserHandler(userService)
+    videoHandler := handler.NewVideoHandler(videoService, userService)
+    
+    // 配置路由
+    api := r.Group("/api/v1")
+    // ... 路由配置
+}
+```
+
+### Redis缓存优化
+
+为提高系统性能，项目对热点数据（如视频详情、用户信息）实现了Redis缓存：
+
+```go
+// 缓存服务接口定义
+type CacheService interface {
+    Get(ctx context.Context, key string, value interface{}) error
+    Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+    Delete(ctx context.Context, key string) error
+}
+
+// 带缓存的视频详情获取实现
+func (s *videoService) GetByID(ctx context.Context, id string) (*model.Video, error) {
+    var video model.Video
+    
+    // 生成缓存键
+    cacheKey := fmt.Sprintf("video:%s", id)
+    
+    // 尝试从缓存获取
+    err := s.cache.Get(ctx, cacheKey, &video)
+    if err == nil {
+        // 缓存命中，记录指标并返回
+        metrics.CacheHitCounter.Inc()
+        return &video, nil
+    }
+    
+    // 缓存未命中，从数据库查询
+    metrics.CacheMissCounter.Inc()
+    objectID, err := primitive.ObjectIDFromHex(id)
+    if err != nil {
+        return nil, err
+    }
+    
+    err = database.GetCollection("videos").FindOne(
+        ctx,
+        bson.M{"_id": objectID},
+    ).Decode(&video)
+    if err != nil {
+        return nil, err
+    }
+    
+    // 写入缓存，过期时间30分钟
+    _ = s.cache.Set(ctx, cacheKey, video, 30*time.Minute)
+    
+    return &video, nil
+}
+```
+
+## 项目开发经验总结
+
+### 开发过程中的关键决策
+
+1. **MongoDB vs 关系型数据库**：选择MongoDB的主要考量点是：
+   - 文档模型适合存储视频元数据和标记等嵌套结构数据
+   - Schema灵活性，便于快速迭代和需求变更
+   - 原生支持JSON格式，减少数据转换开销
+
+2. **Gin框架选择**：使用Gin框架是基于性能和开发效率的权衡：
+   - 高性能HTTP路由
+   - 中间件机制设计合理
+   - 强大的参数验证和绑定功能
+   - 社区活跃度高，文档完善
+
+3. **视频文件存储策略**：
+   - 当前使用本地文件系统存储，便于开发和测试
+   - 预留对象存储接口，后续可无缝迁移到S3兼容对象存储
+   - 区分元数据和文件存储，为后续微服务拆分做准备
+
+### 后续发展规划
+
+1. **微服务架构演进**：
+   - 将用户服务、视频服务、标记服务拆分为独立微服务
+   - 引入服务注册发现组件
+   - 实现API网关层，统一认证和请求分发
+
+2. **性能优化方向**：
+   - 实现内容分发网络(CDN)集成
+   - 添加视频转码服务，支持自适应码率
+   - 优化数据访问模式，减少数据库负载
+
+3. **功能扩展计划**：
+   - 实现视频评论功能
+   - 添加社交分享功能
+   - 开发专注于学习场景的智能推荐系统
