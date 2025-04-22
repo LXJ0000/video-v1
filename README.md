@@ -1820,6 +1820,135 @@ func (s *userService) LoginOrRegisterByPhone(ctx context.Context, phone string) 
 4. **验证码一次性**：验证成功后立即失效，不可重复使用
 5. **防暴力破解**：验证失败次数达到上限后验证码失效
 
+### 短信验证码登录流程图
+
+```
+@startuml
+autonumber
+title 短信验证码发送与验证流程
+
+actor "用户" as User
+participant "前端应用" as Frontend
+participant "Gin路由" as Gin
+participant "UserHandler" as Handler
+participant "CodeService" as CodeService
+participant "SMS接口" as SMSService
+participant "阿里云SMS" as AliyunSMS
+database "Redis" as Redis
+
+== 发送验证码流程 ==
+
+User -> Frontend: 输入手机号并点击"发送验证码"
+Frontend -> Gin: POST /api/v1/users/send_sms_code\n{phone: "13800138000"}
+Gin -> Handler: 调用SendSMSCode方法
+Handler -> Handler: 验证手机号格式 (11位)
+Handler -> CodeService: Send(ctx, "login", phone)
+CodeService -> CodeService: 生成6位随机验证码
+CodeService -> Redis: 执行Lua脚本(LuaSendCode)
+note right of Redis
+  Lua脚本逻辑:
+  1. 检查是否已经有验证码且未过期
+  2. 如果不存在或已过去大部分时间，则写入新验证码
+  3. 设置验证码有效期900秒(15分钟)
+  4. 设置最大尝试次数为3次
+end note
+
+alt 发送频率正常
+    Redis --> CodeService: 返回0(成功)
+    CodeService -> SMSService: Send(templateID, {code: "123456"}, phone)
+    SMSService -> AliyunSMS: 调用阿里云短信SDK发送请求
+    AliyunSMS --> SMSService: 返回发送结果
+    
+    alt 短信发送成功
+        SMSService --> CodeService: 返回nil(成功)
+        CodeService --> Handler: 返回nil(成功)
+        Handler --> Gin: 返回成功响应
+        Gin --> Frontend: 返回成功JSON: {"code":0,"msg":"success"}
+        Frontend --> User: 显示"验证码已发送"
+    else 短信发送失败
+        SMSService --> CodeService: 返回错误
+        CodeService --> Handler: 返回错误
+        Handler --> Gin: 返回错误响应
+        Gin --> Frontend: 返回错误JSON
+        Frontend --> User: 显示错误信息
+    end
+    
+else 发送频率过高
+    Redis --> CodeService: 返回-2(频率限制)
+    CodeService --> Handler: 返回错误(频率过高)
+    Handler --> Gin: 返回错误响应
+    Gin --> Frontend: 返回错误JSON: {"code":429,"msg":"发送过于频繁"}
+    Frontend --> User: 显示"发送过于频繁，请稍后再试"
+end
+
+== 验证码登录流程 ==
+
+User -> Frontend: 输入手机号和验证码，点击"登录"
+Frontend -> Gin: POST /api/v1/users/login/sms\n{phone: "13800138000", code: "123456"}
+Gin -> Handler: 调用LoginBySms方法
+Handler -> Handler: 验证手机号和验证码格式
+Handler -> CodeService: Verify(ctx, "login", phone, code)
+CodeService -> Redis: 执行Lua脚本(LuaVerifyCode)
+note right of Redis
+  Lua脚本逻辑:
+  1. 检查剩余验证次数是否>0
+  2. 比对输入的验证码和存储的验证码
+  3. 验证成功时将剩余次数置为0
+  4. 验证失败时剩余次数-1
+end note
+
+alt 验证码正确
+    Redis --> CodeService: 返回0(成功)
+    CodeService --> Handler: 返回true, nil
+    Handler -> UserService: LoginOrRegisterByPhone(ctx, phone)
+    
+    UserService -> MongoDB: 查询用户是否存在
+    
+    alt 用户已存在
+        MongoDB --> UserService: 返回用户数据
+    else 用户不存在
+        UserService -> UserService: 生成随机用户名
+        UserService -> MongoDB: 创建新用户
+        MongoDB --> UserService: 返回创建结果
+    end
+    
+    UserService -> UserService: 生成JWT令牌
+    UserService --> Handler: 返回用户信息和令牌
+    Handler --> Gin: 返回成功响应
+    Gin --> Frontend: 返回JSON: {"code":0,"user":{...},"token":"..."}
+    Frontend -> Frontend: 保存令牌和用户信息
+    Frontend --> User: 登录成功，跳转到首页
+    
+else 验证码错误或已失效
+    Redis --> CodeService: 返回-2(验证码错误)或-1(次数用尽)
+    CodeService --> Handler: 返回false, error
+    Handler --> Gin: 返回验证失败响应
+    Gin --> Frontend: 返回错误JSON
+    Frontend --> User: 显示"验证码错误或已过期"
+end
+
+@enduml
+```
+
+以上流程图详细展示了短信验证码的发送和验证过程，包括：
+
+1. **验证码发送流程**：
+   - 前端发起验证码请求
+   - 后端生成随机验证码
+   - Redis使用Lua脚本检查频率限制并存储验证码
+
+2. **验证码登录流程**：
+   - 用户提交手机号和验证码
+   - Redis使用Lua脚本验证正确性和尝试次数
+   - 验证通过后查询或创建用户
+   - 生成JWT令牌并返回
+
+3. **安全控制点**：
+   - 验证码发送频率限制
+   - 验证码有效期控制
+   - 验证尝试次数限制
+   - 成功验证后立即失效
+
 ## 项目开发经验总结
 
 ### 开发过程中的关键决策
