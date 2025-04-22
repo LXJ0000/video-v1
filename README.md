@@ -1605,6 +1605,221 @@ func (s *videoService) GetByID(ctx context.Context, id string) (*model.Video, er
 }
 ```
 
+### 短信验证码登录实现
+
+项目实现了短信验证码登录功能，支持验证码发送和验证，主要包括以下几个方面：
+
+#### 验证码生成与存储
+
+使用Redis和Lua脚本实现验证码的生成、存储和校验：
+
+```go
+// Redis Lua脚本实现验证码发送逻辑
+func (c *codeServiceImpl) Send(ctx context.Context, biz, number string) error {
+    // 生成6位随机验证码
+    code := c.genCode()
+    
+    // 调用Redis Lua脚本设置验证码
+    codeKey := fmt.Sprintf("code:%s:%s", biz, number)
+    cache := redis.GetClient()
+    res, err := cache.Eval(ctx, script.LuaSendCode, []string{codeKey}, code).Int()
+    
+    if err != nil {
+        return err
+    }
+    
+    // 根据脚本返回值判断结果
+    switch res {
+    case 0: // 正常发送
+        // 调用短信服务发送验证码
+        templateID := config.GlobalConfig.SMS.TemplateID
+        return c.sms.Send(ctx, templateID, []sms.Param{{Name: "code", Value: code}}, number)
+    case -2: // 发送频率过高
+        return errors.New("验证码发送过于频繁，请稍后再试")
+    default:
+        return errors.New("系统错误")
+    }
+}
+```
+
+#### 发送频率限制与防刷
+
+使用Lua脚本实现验证码的发送频率限制和防刷保护：
+
+```lua
+-- 发送验证码Lua脚本
+local key = KEYS[1] -- 存储验证码的key code:biz:phone
+local cnt = key..":cnt" -- 存储剩余验证次数的key code:biz:phone:cnt
+local val = ARGV[1] -- 发送的验证码
+local ttl = tonumber(redis.call("ttl", key)) -- 验证码剩余有效期
+
+if ttl == -1 then -- -1 表示没有设置过期时间
+    return -1 -- key 存在但没有设置过期时间，系统异常
+elseif ttl == -2 or ttl < 840 then -- -2 表示 key 不存在或剩余过期时间小于14分钟
+    redis.call("set", key, val)
+    redis.call("expire", key, 900) -- 15分钟有效期
+    redis.call("set", cnt, 3) -- 最多验证3次
+    redis.call("expire", cnt, 900)
+    return 0 -- 正常发送验证码
+else
+    return -2 -- 发送频率过高
+end
+```
+
+#### 验证码校验流程
+
+验证码校验同样使用Lua脚本实现，确保原子性操作和安全性：
+
+```lua
+-- 验证码校验Lua脚本
+local key = KEYS[1] -- 存储验证码的key code:biz:phone
+local cnt = key..":cnt" -- 存储剩余验证次数的key code:biz:phone:cnt
+local val = ARGV[1] -- 用户输入的验证码
+
+if tonumber(redis.call("get", cnt)) <= 0 then
+    return -1 -- 验证次数已用完或已验证过
+elseif redis.call("get", key) == val then
+    redis.call("set", cnt, 0) -- 验证成功后将剩余验证次数置为0
+    return 0 -- 验证码正确
+else
+    redis.call("decr", cnt) -- 验证失败，剩余次数减1
+    return -2 -- 验证码错误
+end
+```
+
+#### 阿里云短信服务集成
+
+系统集成了阿里云短信服务，用于发送实际的短信验证码：
+
+```go
+// 阿里云短信服务实现
+type Service struct {
+    appID    string
+    signName string
+    client   sms.Client
+}
+
+func (s *Service) Send(ctx context.Context, templateID string, args []sms2.Param, numbers ...string) error {
+    for _, number := range numbers {
+        // 将参数转换为模板参数格式
+        argsMap := make(map[string]string, len(args))
+        for _, arg := range args {
+            argsMap[arg.Name] = arg.Value
+        }
+        templateParam, err := json.Marshal(argsMap)
+        if err != nil {
+            continue
+        }
+        
+        // 调用阿里云SDK发送短信
+        templateParamStr := string(templateParam)
+        req := sms.SendSmsRequest{
+            PhoneNumbers:  &number,
+            SignName:      &s.signName,
+            TemplateCode:  &templateID,
+            TemplateParam: &templateParamStr, // 如："{\"code\":\"1234\"}"
+        }
+        
+        resp, err := s.client.SendSms(&req)
+        if err != nil {
+            continue
+        }
+        
+        // 记录日志并检查响应
+        if resp.Body != nil && *(resp.Body.Message) != "OK" {
+            slog.Error("发送短信失败")
+        }
+    }
+    return nil
+}
+```
+
+#### 登录注册一体化设计
+
+短信验证成功后，系统会自动完成登录或注册流程：
+
+```go
+// 短信验证码登录/注册处理
+func (h *UserHandler) LoginBySms(c *gin.Context) {
+    // 参数绑定与验证...
+    
+    // 验证验证码
+    verified, err := h.codeService.Verify(c.Request.Context(), "login", req.Phone, req.Code)
+    if err != nil {
+        response.Fail(c, http.StatusInternalServerError, "验证码验证失败: "+err.Error())
+        return
+    }
+
+    if !verified {
+        response.Fail(c, http.StatusUnauthorized, "验证码错误或已过期")
+        return
+    }
+
+    // 验证通过，执行登录或注册流程
+    user, token, err := h.userService.LoginOrRegisterByPhone(c.Request.Context(), req.Phone)
+    if err != nil {
+        response.Fail(c, http.StatusInternalServerError, "登录失败: "+err.Error())
+        return
+    }
+
+    response.Success(c, gin.H{
+        "user":  user,
+        "token": token,
+    })
+}
+
+// 登录或注册业务逻辑
+func (s *userService) LoginOrRegisterByPhone(ctx context.Context, phone string) (*model.User, string, error) {
+    // 查找是否已存在该手机号的用户
+    var user model.User
+    err := collection.FindOne(ctx, bson.M{"phone": phone}).Decode(&user)
+    
+    if err != nil {
+        // 用户不存在，创建新用户
+        if err == mongo.ErrNoDocuments {
+            // 生成随机用户名
+            randomStr := fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+            username := "user_" + phone[len(phone)-4:] + "_" + randomStr
+            
+            // 创建新用户
+            user = model.User{
+                ID:        primitive.NewObjectID(),
+                Username:  username,
+                Phone:     phone,
+                Status:    1,
+                CreatedAt: time.Now(),
+                UpdatedAt: time.Now(),
+            }
+            
+            _, err = collection.InsertOne(ctx, user)
+            if err != nil {
+                return nil, "", fmt.Errorf("创建用户失败: %w", err)
+            }
+        } else {
+            return nil, "", fmt.Errorf("数据库查询错误: %w", err)
+        }
+    }
+    
+    // 生成JWT令牌
+    token, err := utils.GenerateToken(user.ID.Hex(), user.Username)
+    if err != nil {
+        return nil, "", fmt.Errorf("生成token失败: %w", err)
+    }
+    
+    return &user, token, nil
+}
+```
+
+#### 安全考虑
+
+短信验证码登录实现了多重安全措施：
+
+1. **有效期限制**：验证码15分钟内有效
+2. **尝试次数限制**：每个验证码最多验证3次
+3. **发送频率限制**：一分钟内只能发送一次验证码
+4. **验证码一次性**：验证成功后立即失效，不可重复使用
+5. **防暴力破解**：验证失败次数达到上限后验证码失效
+
 ## 项目开发经验总结
 
 ### 开发过程中的关键决策
