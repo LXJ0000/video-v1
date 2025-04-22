@@ -89,7 +89,7 @@
 
 ### 发送短信验证码
 - 请求方式: `POST`
-- 路径: `/users/sms-code`
+- 路径: `/users/send_sms_code`
 - Content-Type: `application/json`
 - 请求体:
 ```json
@@ -144,52 +144,6 @@
   - 401: 验证码错误或已过期
   - 403: 账号被禁用
 
-### 刷新令牌
-- 请求方式: `POST`
-- 路径: `/users/refresh-token`
-- 请求头: `Authorization: Bearer {token}`
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "success",
-    "data": {
-        "token": "string",
-        "expiresAt": "2024-03-26T10:00:00Z"
-    }
-}
-```
-
-### 获取当前用户信息
-- 请求方式: `GET`
-- 路径: `/users/me`
-- 请求头: `Authorization: Bearer {token}`
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "success",
-    "data": {
-        "id": "string",
-        "username": "string",
-        "email": "string",
-        "status": 1,
-        "profile": {
-            "nickname": "string",
-            "avatar": "string",
-            "bio": "string"
-        },
-        "stats": {
-            "videos": 10,
-            "followers": 20,
-            "following": 30
-        },
-        "createdAt": "2024-02-26T10:00:00Z",
-        "updatedAt": "2024-02-26T10:00:00Z"
-    }
-}
-```
-
 ### 获取用户个人资料
 - 请求方式: `GET`
 - 路径: `/users/:userId/profile`
@@ -199,15 +153,16 @@
     "code": 0,
     "msg": "success",
     "data": {
-        "userId": "string",
+        "id": "string",
         "username": "string",
         "nickname": "string",
+        "email": "string",
         "avatar": "string",
         "bio": "string",
         "stats": {
-            "videos": 10,
-            "followers": 20,
-            "following": 30
+            "uploadedVideos": 10,
+            "totalWatchTime": 120,
+            "totalLikes": 50
         },
         "createdAt": "2024-02-26T10:00:00Z"
     }
@@ -222,9 +177,11 @@
 - 请求体:
 ```json
 {
+    "username": "string",  // 可选
+    "email": "string",     // 可选
     "nickname": "string",  // 可选
-    "avatar": "string",    // 可选，头像URL或base64
-    "bio": "string"        // 可选，个人简介
+    "bio": "string",       // 可选，个人简介
+    "avatar": "string"     // 可选，base64编码的头像
 }
 ```
 - 响应示例:
@@ -232,7 +189,20 @@
 {
     "code": 0,
     "msg": "更新成功",
-    "data": null
+    "data": {
+        "id": "string",
+        "username": "string",
+        "nickname": "string",
+        "email": "string",
+        "avatar": "string",
+        "bio": "string",
+        "stats": {
+            "uploadedVideos": 10,
+            "totalWatchTime": 120,
+            "totalLikes": 50
+        },
+        "createdAt": "2024-02-26T10:00:00Z"
+    }
 }
 ```
 - 错误情况:
@@ -246,64 +216,30 @@
 - 请求头: `Authorization: Bearer {token}`
 - 查询参数:
   - `page`: 页码，默认1
-  - `pageSize`: 每页数量，默认20
+  - `size`: 每页数量，默认12
 - 响应示例:
 ```json
 {
     "code": 0,
     "msg": "success",
     "data": {
+        "history": [
+            {
+                "id": "string",
+                "videoId": "string",
+                "videoTitle": "string",
+                "coverUrl": "string",
+                "watchedAt": "2024-02-26T10:00:00Z",
+                "progress": 60,
+                "videoDuration": 120
+            }
+        ],
         "total": 50,
         "page": 1,
-        "pageSize": 20,
-        "items": [{
-            "id": "string",
-            "videoId": "string",
-            "title": "string",
-            "coverUrl": "string",
-            "duration": 180.5,
-            "watchedDuration": 120.2,
-            "progress": 0.67,
-            "watchedAt": "2024-03-16T10:00:00Z"
-        }]
+        "size": 12
     }
 }
 ```
-- 错误情况:
-  - 403: 无权访问
-
-### 添加到收藏
-- 请求方式: `POST`
-- 路径: `/videos/:videoId/favorite`
-- 请求头: `Authorization: Bearer {token}`
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "收藏成功",
-    "data": null
-}
-```
-- 错误情况:
-  - 403: 无权操作
-  - 404: 视频不存在
-  - 409: 已经收藏过
-
-### 移除收藏
-- 请求方式: `DELETE`
-- 路径: `/videos/:videoId/favorite`
-- 请求头: `Authorization: Bearer {token}`
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "取消收藏成功",
-    "data": null
-}
-```
-- 错误情况:
-  - 403: 无权操作
-  - 404: 视频不存在或未收藏
 
 ### 获取收藏列表
 - 请求方式: `GET`
@@ -311,236 +247,313 @@
 - 请求头: `Authorization: Bearer {token}`
 - 查询参数:
   - `page`: 页码，默认1
-  - `pageSize`: 每页数量，默认20
+  - `size`: 每页数量，默认12
 - 响应示例:
 ```json
 {
     "code": 0,
     "msg": "success",
     "data": {
+        "favorites": [
+            {
+                "id": "string",
+                "videoId": "string",
+                "videoTitle": "string",
+                "coverUrl": "string",
+                "addedAt": "2024-02-26T10:00:00Z",
+                "videoDuration": 120
+            }
+        ],
         "total": 30,
         "page": 1,
-        "pageSize": 20,
-        "items": [{
-            "id": "string",
-            "videoId": "string",
-            "title": "string",
-            "coverUrl": "string",
-            "duration": 180.5,
-            "createdAt": "2024-03-16T10:00:00Z",
-            "status": "public"
-        }]
+        "size": 12
     }
 }
 ```
-- 错误情况:
-  - 403: 无权访问
+
+### 添加视频到收藏
+- 请求方式: `POST`
+- 路径: `/videos/:videoId/favorite`
+- 请求头: `Authorization: Bearer {token}`
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "message": "添加收藏成功"
+    }
+}
+```
+
+### 从收藏中移除视频
+- 请求方式: `DELETE`
+- 路径: `/videos/:videoId/favorite`
+- 请求头: `Authorization: Bearer {token}`
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "message": "取消收藏成功"
+    }
+}
+```
 
 ### 记录观看历史
 - 请求方式: `POST`
 - 路径: `/videos/:videoId/watch`
 - 请求头: `Authorization: Bearer {token}`
-- Content-Type: `application/json`
-- 请求体:
-```json
-{
-    "duration": 120.5,  // 已观看时长（秒）
-    "progress": 0.65    // 进度百分比（0-1之间的小数）
-}
-```
 - 响应示例:
 ```json
 {
     "code": 0,
-    "msg": "记录成功",
-    "data": null
+    "msg": "success",
+    "data": {
+        "message": "记录观看历史成功"
+    }
 }
 ```
-- 错误情况:
-  - 400: 参数不合法
-  - 403: 无权操作
-  - 404: 视频不存在
 
-## 视频相关
+## 视频相关接口
 
 ### 获取公开视频列表
 - 请求方式: `GET`
 - 路径: `/videos/public`
 - 查询参数:
   - `page`: 页码，默认1
-  - `pageSize`: 每页数量，默认10，最大50
-  - `keyword`: 搜索关键词（可选）
-  - `sortBy`: 排序字段（可选，支持：created_at/views/likes）
-  - `sortOrder`: 排序方向（可选，asc/desc，默认desc）
-  - `tags`: 标签筛选（可选，多个标签用逗号分隔）
+  - `size`: 每页数量，默认12
 - 响应示例:
 ```json
 {
     "code": 0,
     "msg": "success",
     "data": {
+        "videos": [
+            {
+                "id": "string",
+                "title": "string",
+                "coverUrl": "string",
+                "videoUrl": "string",
+                "description": "string",
+                "duration": 120,
+                "userId": "string",
+                "username": "string",
+                "stats": {
+                    "views": 100,
+                    "likes": 10,
+                    "comments": 5
+                },
+                "createdAt": "2024-02-26T10:00:00Z"
+            }
+        ],
         "total": 100,
         "page": 1,
-        "pageSize": 10,
-        "items": [{
-            "id": "string",
-            "title": "string",
-            "description": "string",
-            "coverUrl": "string",
-            "thumbnailUrl": "string",
-            "duration": 180.5,
-            "status": "public",
-            "tags": ["标签1", "标签2"],
-            "stats": {
-                "views": 1000,
-                "likes": 100,
-                "comments": 50
-            },
-            "createdAt": "2024-02-26T10:00:00Z"
-        }]
+        "size": 12
     }
 }
 ```
 
-### 获取视频列表（需要认证）
+### 获取用户视频列表
 - 请求方式: `GET`
 - 路径: `/videos`
 - 请求头: `Authorization: Bearer {token}`
 - 查询参数:
   - `page`: 页码，默认1
-  - `pageSize`: 每页数量，默认10，最大50
-  - `status`: 视频状态（可选，支持：public/private/draft）
-  - `keyword`: 搜索关键词（可选）
-  - `sortBy`: 排序字段（可选，支持：created_at/views/likes/file_size）
-  - `sortOrder`: 排序方向（可选，asc/desc，默认desc）
-  - `startDate`: 开始日期（可选，格式：YYYY-MM-DD）
-  - `endDate`: 结束日期（可选，格式：YYYY-MM-DD）
-  - `tags`: 标签筛选（可选，多个标签用逗号分隔）
-- 响应格式同上
+  - `size`: 每页数量，默认12
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "videos": [
+            {
+                "id": "string",
+                "title": "string",
+                "coverUrl": "string",
+                "videoUrl": "string",
+                "description": "string",
+                "duration": 120,
+                "stats": {
+                    "views": 100,
+                    "likes": 10,
+                    "comments": 5
+                },
+                "status": "public",
+                "createdAt": "2024-02-26T10:00:00Z",
+                "updatedAt": "2024-02-26T10:00:00Z"
+            }
+        ],
+        "total": 50,
+        "page": 1,
+        "size": 12
+    }
+}
+```
 
 ### 上传视频
 - 请求方式: `POST`
 - 路径: `/videos`
 - 请求头: `Authorization: Bearer {token}`
 - Content-Type: `multipart/form-data`
-- 请求参数:
-  - `file`: 视频文件（必填，支持mp4/mov/avi/wmv/flv/mkv，最大1GB）
-  - `cover`: 封面图（可选，支持jpg/jpeg/png，最大2MB）
-  - `title`: 标题（必填，1-100个字符）
-  - `description`: 描述（可选，最多500个字符）
-  - `status`: 状态（可选，public/private/draft，默认private）
-  - `duration`: 时长（必填，单位：秒，支持小数点后1位）
-  - `tags`: 标签（可选，多个标签用逗号分隔，每个标签最多20个字符）
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "上传成功",
-    "data": {
-        "id": "string",
-        "title": "string",
-        "description": "string",
-        "fileName": "string",
-        "fileSize": 1024000,
-        "format": "mp4",
-        "duration": 180.5,
-        "status": "private",
-        "coverUrl": "string",
-        "thumbnailUrl": "string",
-        "tags": ["标签1", "标签2"],
-        "createdAt": "2024-02-26T10:00:00Z",
-        "updatedAt": "2024-02-26T10:00:00Z"
-    }
-}
-```
-- 错误情况:
-  - 400: 参数不合法
-  - 413: 文件大小超过限制
-  - 415: 不支持的文件格式
-  - 507: 存储空间不足
-
-### 获取视频详情
-- 请求方式: `GET`
-- 路径: `/videos/:id`
-- 请求头: `Authorization: Bearer {token}` (对于非公开视频必须提供)
+- 表单参数:
+  - `title`: 视频标题
+  - `description`: 视频描述
+  - `video`: 视频文件
+  - `cover`: 封面图片
 - 响应示例:
 ```json
 {
     "code": 0,
     "msg": "success",
     "data": {
-        "video": {
-            "id": "string",
-            "userId": "string",
-            "title": "string",
-            "description": "string",
-            "fileName": "string",
-            "fileSize": 1024000,
-            "format": "mp4",
-            "duration": 180.5,
-            "status": "public",
-            "coverUrl": "string",
-            "thumbnailUrl": "string",
-            "tags": ["标签1", "标签2"],
-            "stats": {
-                "views": 1000,
-                "likes": 100,
-                "comments": 50,
-                "shares": 20
-            },
-            "createdAt": "2024-02-26T10:00:00Z",
-            "updatedAt": "2024-02-26T10:00:00Z"
+        "id": "string",
+        "title": "string",
+        "coverUrl": "string",
+        "videoUrl": "string",
+        "description": "string",
+        "duration": 120,
+        "userId": "string",
+        "username": "string",
+        "stats": {
+            "views": 0,
+            "likes": 0,
+            "comments": 0
         },
-        "isFavorite": true  // 当用户已登录时，返回该用户是否已收藏此视频
+        "status": "public",
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
     }
 }
 ```
-- 错误情况:
-  - 404: 视频不存在
-  - 403: 无权访问
+
+### 获取视频详情
+- 请求方式: `GET`
+- 路径: `/videos/:videoId`
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "id": "string",
+        "title": "string",
+        "coverUrl": "string",
+        "videoUrl": "string",
+        "description": "string",
+        "duration": 120,
+        "userId": "string",
+        "username": "string",
+        "stats": {
+            "views": 100,
+            "likes": 10,
+            "comments": 5
+        },
+        "status": "public",
+        "favorited": true,
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
+    }
+}
+```
 
 ### 更新视频信息
 - 请求方式: `PUT`
-- 路径: `/videos/:id`
+- 路径: `/videos/:videoId`
 - 请求头: `Authorization: Bearer {token}`
 - Content-Type: `application/json`
 - 请求体:
 ```json
 {
-    "title": "string",         // 可选
-    "description": "string",   // 可选
-    "status": "string",        // 可选，public/private/draft
-    "tags": ["string"]         // 可选
+    "title": "string",       // 可选
+    "description": "string", // 可选
+    "status": "string"       // 可选，public或private
 }
 ```
 - 响应示例:
 ```json
 {
     "code": 0,
-    "msg": "更新成功",
-    "data": null
+    "msg": "success",
+    "data": {
+        "id": "string",
+        "title": "string",
+        "coverUrl": "string",
+        "videoUrl": "string",
+        "description": "string",
+        "duration": 120,
+        "userId": "string",
+        "username": "string",
+        "stats": {
+            "views": 100,
+            "likes": 10,
+            "comments": 5
+        },
+        "status": "public",
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
+    }
 }
 ```
-- 错误情况:
-  - 400: 参数不合法
-  - 403: 无权操作
-  - 404: 视频不存在
 
 ### 删除视频
 - 请求方式: `DELETE`
-- 路径: `/videos/:id`
+- 路径: `/videos/:videoId`
 - 请求头: `Authorization: Bearer {token}`
 - 响应示例:
 ```json
 {
     "code": 0,
-    "msg": "删除成功",
+    "msg": "success",
     "data": null
 }
 ```
-- 错误情况:
-  - 403: 无权操作
-  - 404: 视频不存在
+
+### 视频流播放
+- 请求方式: `GET`
+- 路径: `/videos/:videoId/stream`
+- 参数:
+  - 可选的 Range 头，支持断点续传
+- 响应:
+  - Content-Type: video/mp4
+  - 支持范围请求(206 Partial Content)
+
+### 更新视频缩略图
+- 请求方式: `POST`
+- 路径: `/videos/:videoId/thumbnail`
+- 请求头: `Authorization: Bearer {token}`
+- Content-Type: `multipart/form-data`
+- 表单参数:
+  - `cover`: 新封面图片
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "coverUrl": "string"
+    }
+}
+```
+
+### 获取视频统计信息
+- 请求方式: `GET`
+- 路径: `/videos/:videoId/stats`
+- 请求头: `Authorization: Bearer {token}`
+- 响应示例:
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "views": 100,
+        "likes": 10,
+        "comments": 5
+    }
+}
+```
 
 ### 批量操作视频
 - 请求方式: `POST`
@@ -550,79 +563,23 @@
 - 请求体:
 ```json
 {
-    "ids": ["string"],                        // 视频ID列表
-    "action": "string",                       // 操作类型：delete/update_status
-    "status": "string"                        // 当action为update_status时需要
+    "operation": "string", // delete, public, private
+    "videoIds": ["string"]
 }
 ```
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "操作成功",
-    "data": {
-        "successCount": 2,
-        "failedCount": 0,
-        "failedIds": []
-    }
-}
-```
-
-### 更新视频缩略图
-- 请求方式: `POST`
-- 路径: `/videos/:id/thumbnail`
-- 请求头: `Authorization: Bearer {token}`
-- Content-Type: `multipart/form-data`
-- 请求参数:
-  - `file`: 图片文件（必填，支持jpg/jpeg/png，最大2MB）
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "更新成功",
-    "data": {
-        "thumbnailUrl": "string"
-    }
-}
-```
-
-### 获取视频统计信息
-- 请求方式: `GET`
-- 路径: `/videos/:id/stats`
-- 请求头: `Authorization: Bearer {token}` (对于非公开视频必须提供)
 - 响应示例:
 ```json
 {
     "code": 0,
     "msg": "success",
     "data": {
-        "views": 1000,
-        "likes": 100,
-        "comments": 50,
-        "shares": 20
+        "success": true,
+        "message": "批量操作成功"
     }
 }
 ```
 
-### 视频流式播放
-- 请求方式: `GET`
-- 路径: `/videos/:id/stream`
-- 请求头: 
-  - `Authorization: Bearer {token}` (对于非公开视频必须提供)
-  - `Range: bytes=start-end` (可选，支持范围请求)
-- 响应头:
-  - `Content-Type: video/mp4` (或其他视频格式)
-  - `Accept-Ranges: bytes`
-  - `Content-Length: size`
-  - `Content-Range: bytes start-end/total` (范围请求时)
-- 响应状态码:
-  - 200: 完整内容
-  - 206: 部分内容（范围请求）
-  - 403: 无权访问
-  - 404: 视频不存在
-- 响应内容: 直接返回视频流
-
-## 标记与笔记相关
+## 标记相关接口
 
 ### 添加标记
 - 请求方式: `POST`
@@ -632,9 +589,10 @@
 - 请求体:
 ```json
 {
-    "videoId": "string",      // 视频ID
-    "timestamp": 123.45,      // 时间戳，单位：秒
-    "content": "string"       // 标记内容
+    "videoId": "string",
+    "content": "string",
+    "timestamp": 30,
+    "type": "comment"
 }
 ```
 - 响应示例:
@@ -644,86 +602,51 @@
     "msg": "success",
     "data": {
         "id": "string",
-        "userId": "string",
         "videoId": "string",
-        "timestamp": 123.45,
+        "userId": "string",
+        "username": "string",
         "content": "string",
-        "annotations": [],
-        "createdAt": "2024-03-16T10:00:00Z",
-        "updatedAt": "2024-03-16T10:00:00Z"
+        "timestamp": 30,
+        "type": "comment",
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
     }
 }
 ```
-- 错误情况:
-  - 400: 参数不合法
-  - 403: 无权操作
-  - 404: 视频不存在
 
 ### 获取标记列表
 - 请求方式: `GET`
 - 路径: `/marks`
 - 请求头: `Authorization: Bearer {token}`
 - 查询参数:
-  - `videoId`: 视频ID(必填)
+  - `videoId`: 视频ID
   - `page`: 页码，默认1
-  - `pageSize`: 每页数量，默认20
-  - `sortBy`: 排序字段（可选，默认timestamp）
-  - `sortOrder`: 排序方向（可选，asc/desc，默认asc）
+  - `size`: 每页数量，默认20
 - 响应示例:
 ```json
 {
     "code": 0,
     "msg": "success",
     "data": {
-        "total": 10,
-        "page": 1,
-        "pageSize": 20,
-        "items": [{
-            "id": "string",
-            "userId": "string",
-            "videoId": "string",
-            "timestamp": 123.45,
-            "content": "string",
-            "annotations": [{
+        "marks": [
+            {
                 "id": "string",
+                "videoId": "string",
+                "userId": "string",
+                "username": "string",
                 "content": "string",
-                "createdAt": "2024-03-16T10:00:00Z"
-            }],
-            "createdAt": "2024-03-16T10:00:00Z",
-            "updatedAt": "2024-03-16T10:00:00Z"
-        }]
+                "timestamp": 30,
+                "type": "comment",
+                "createdAt": "2024-02-26T10:00:00Z",
+                "updatedAt": "2024-02-26T10:00:00Z"
+            }
+        ],
+        "total": 20,
+        "page": 1,
+        "size": 20
     }
 }
 ```
-
-### 获取标记详情
-- 请求方式: `GET`
-- 路径: `/marks/:markId`
-- 请求头: `Authorization: Bearer {token}`
-- 响应示例:
-```json
-{
-    "code": 0,
-    "msg": "success",
-    "data": {
-        "id": "string",
-        "userId": "string",
-        "videoId": "string",
-        "timestamp": 123.45,
-        "content": "string",
-        "annotations": [{
-            "id": "string",
-            "content": "string",
-            "createdAt": "2024-03-16T10:00:00Z"
-        }],
-        "createdAt": "2024-03-16T10:00:00Z",
-        "updatedAt": "2024-03-16T10:00:00Z"
-    }
-}
-```
-- 错误情况:
-  - 403: 无权访问
-  - 404: 标记不存在
 
 ### 更新标记
 - 请求方式: `PUT`
@@ -733,22 +656,28 @@
 - 请求体:
 ```json
 {
-    "timestamp": 123.45,      // 可选
-    "content": "string"       // 可选
+    "content": "string",
+    "timestamp": 35
 }
 ```
 - 响应示例:
 ```json
 {
     "code": 0,
-    "msg": "更新成功",
-    "data": null
+    "msg": "success",
+    "data": {
+        "id": "string",
+        "videoId": "string",
+        "userId": "string",
+        "username": "string",
+        "content": "string",
+        "timestamp": 35,
+        "type": "comment",
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
+    }
 }
 ```
-- 错误情况:
-  - 400: 参数不合法
-  - 403: 无权操作
-  - 404: 标记不存在
 
 ### 删除标记
 - 请求方式: `DELETE`
@@ -758,13 +687,10 @@
 ```json
 {
     "code": 0,
-    "msg": "删除成功",
+    "msg": "success",
     "data": null
 }
 ```
-- 错误情况:
-  - 403: 无权操作
-  - 404: 标记不存在
 
 ### 添加注释
 - 请求方式: `POST`
@@ -774,7 +700,7 @@
 - 请求体:
 ```json
 {
-    "content": "string"       // 注释内容
+    "content": "string"
 }
 ```
 - 响应示例:
@@ -785,9 +711,11 @@
     "data": {
         "id": "string",
         "markId": "string",
+        "userId": "string",
+        "username": "string",
         "content": "string",
-        "createdAt": "2024-03-16T10:00:00Z",
-        "updatedAt": "2024-03-16T10:00:00Z"
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
     }
 }
 ```
@@ -801,16 +729,17 @@
 {
     "code": 0,
     "msg": "success",
-    "data": {
-        "total": 5,
-        "items": [{
+    "data": [
+        {
             "id": "string",
             "markId": "string",
+            "userId": "string",
+            "username": "string",
             "content": "string",
-            "createdAt": "2024-03-16T10:00:00Z",
-            "updatedAt": "2024-03-16T10:00:00Z"
-        }]
-    }
+            "createdAt": "2024-02-26T10:00:00Z",
+            "updatedAt": "2024-02-26T10:00:00Z"
+        }
+    ]
 }
 ```
 
@@ -829,8 +758,16 @@
 ```json
 {
     "code": 0,
-    "msg": "更新成功",
-    "data": null
+    "msg": "success",
+    "data": {
+        "id": "string",
+        "markId": "string",
+        "userId": "string",
+        "username": "string",
+        "content": "string",
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
+    }
 }
 ```
 
@@ -842,10 +779,12 @@
 ```json
 {
     "code": 0,
-    "msg": "删除成功",
+    "msg": "success",
     "data": null
 }
 ```
+
+## 笔记相关接口
 
 ### 添加笔记
 - 请求方式: `POST`
@@ -855,10 +794,9 @@
 - 请求体:
 ```json
 {
-    "videoId": "string",      // 视频ID
-    "timestamp": 123.45,      // 时间戳，单位：秒，可选
-    "content": "string",      // 笔记内容
-    "title": "string"         // a笔记标题，可选
+    "videoId": "string",
+    "title": "string",
+    "content": "string"
 }
 ```
 - 响应示例:
@@ -868,13 +806,12 @@
     "msg": "success",
     "data": {
         "id": "string",
-        "userId": "string",
         "videoId": "string",
-        "timestamp": 123.45,
+        "userId": "string",
         "title": "string",
         "content": "string",
-        "createdAt": "2024-03-16T10:00:00Z",
-        "updatedAt": "2024-03-16T10:00:00Z"
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
     }
 }
 ```
@@ -884,29 +821,23 @@
 - 路径: `/notes`
 - 请求头: `Authorization: Bearer {token}`
 - 查询参数:
-  - `videoId`: 视频ID(必填)
-  - `page`: 页码，默认1
-  - `pageSize`: 每页数量，默认20
+  - `videoId`: 视频ID
 - 响应示例:
 ```json
 {
     "code": 0,
     "msg": "success",
-    "data": {
-        "total": 10,
-        "page": 1,
-        "pageSize": 20,
-        "items": [{
+    "data": [
+        {
             "id": "string",
-            "userId": "string",
             "videoId": "string",
-            "timestamp": 123.45,
+            "userId": "string",
             "title": "string",
             "content": "string",
-            "createdAt": "2024-03-16T10:00:00Z",
-            "updatedAt": "2024-03-16T10:00:00Z"
-        }]
-    }
+            "createdAt": "2024-02-26T10:00:00Z",
+            "updatedAt": "2024-02-26T10:00:00Z"
+        }
+    ]
 }
 ```
 
@@ -918,17 +849,24 @@
 - 请求体:
 ```json
 {
-    "timestamp": 123.45,    // 可选
-    "title": "string",      // 可选
-    "content": "string"     // 可选
+    "title": "string",
+    "content": "string"
 }
 ```
 - 响应示例:
 ```json
 {
     "code": 0,
-    "msg": "更新成功",
-    "data": null
+    "msg": "success",
+    "data": {
+        "id": "string",
+        "videoId": "string",
+        "userId": "string",
+        "title": "string",
+        "content": "string",
+        "createdAt": "2024-02-26T10:00:00Z",
+        "updatedAt": "2024-02-26T10:00:00Z"
+    }
 }
 ```
 
@@ -940,23 +878,20 @@
 ```json
 {
     "code": 0,
-    "msg": "删除成功",
+    "msg": "success",
     "data": null
 }
 ```
 
-### 导出标记和笔记
+## 导出相关接口
+
+### 导出标记、注释和笔记
 - 请求方式: `GET`
-- 路径: `/videos/:videoId/export`
+- 路径: `/videos/export`
 - 请求头: `Authorization: Bearer {token}`
 - 查询参数:
-  - `type`: 导出类型（marks/notes/all，默认all）
-  - `format`: 导出格式（txt/json/pdf，默认txt）
-- 响应状态码:
-  - 200: 成功
-  - 403: 无权操作
-  - 404: 视频不存在
-- 响应头:
-  - `Content-Type: application/json` 或 `text/plain` 或 `application/pdf`
-  - `Content-Disposition: attachment; filename="export_{videoId}_{timestamp}.{format}"`
-- 响应内容: 导出的文件内容 
+  - `videoId`: 视频ID
+  - `format`: 导出格式，支持 `json`, `csv`, `pdf`，默认为 `json`
+- 响应:
+  - Content-Type: 取决于format参数
+  - Content-Disposition: attachment; filename="export.{format}" 
